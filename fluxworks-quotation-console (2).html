@@ -1,0 +1,2645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FluxWorks — Quotation Console</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0d0f12;
+    --surface: #161920;
+    --surface2: #1e2229;
+    --surface3: #252b34;
+    --border: #2a3040;
+    --border2: #35404f;
+    --accent: #3b82f6;
+    --accent-dim: rgba(59,130,246,0.12);
+    --accent2: #10b981;
+    --accent2-dim: rgba(16,185,129,0.12);
+    --warn: #f59e0b;
+    --warn-dim: rgba(245,158,11,0.12);
+    --danger: #ef4444;
+    --danger-dim: rgba(239,68,68,0.1);
+    --text: #e8eaf0;
+    --text2: #8b95a8;
+    --text3: #4f5a6a;
+    --mono: 'DM Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; display: flex; font-size: 14px; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px; min-height: 100vh; background: var(--surface);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column;
+    flex-shrink: 0; position: fixed; top: 0; left: 0; height: 100vh; z-index: 10;
+  }
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 30px; height: 30px; background: var(--accent);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; color: #fff;
+  }
+  .logo-text { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 10px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
+  .sidebar-nav { padding: 12px 10px; flex: 1; }
+  .nav-section { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--mono); padding: 10px 10px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    border-radius: var(--radius-sm); cursor: pointer; color: var(--text2);
+    font-size: 13.5px; transition: all 0.15s; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent-dim); color: var(--accent); }
+  .nav-item svg { flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto; background: var(--accent); color: #fff;
+    font-size: 10px; font-family: var(--mono); padding: 1px 6px; border-radius: 99px;
+  }
+  .sidebar-bottom {
+    padding: 14px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+  .avatar-name { font-size: 12.5px; font-weight: 500; }
+  .avatar-role { font-size: 11px; color: var(--text3); }
+
+  /* Main */
+  .main { margin-left: 220px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* Topbar */
+  .topbar {
+    height: 56px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 24px; gap: 16px;
+    background: var(--surface); position: sticky; top: 0; z-index: 5;
+  }
+  .topbar-title { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: var(--radius-sm); font-size: 13px;
+    font-weight: 500; cursor: pointer; transition: all 0.15s; border: none;
+    font-family: var(--sans);
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* Content */
+  .content { padding: 24px; flex: 1; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 8px 16px; font-size: 13px; cursor: pointer; color: var(--text2);
+    border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* Stats row */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px;
+  }
+  .stat-label { font-size: 11.5px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .stat-val { font-size: 26px; font-weight: 600; letter-spacing: -0.5px; line-height: 1; margin-bottom: 6px; }
+  .stat-change { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+  .up { color: var(--accent2); }
+  .down { color: var(--danger); }
+
+  /* Filters */
+  .filters { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; }
+  .search-box {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 7px 12px; flex: 1; max-width: 300px;
+  }
+  .search-box input {
+    background: none; border: none; outline: none; color: var(--text);
+    font-family: var(--sans); font-size: 13px; width: 100%;
+  }
+  .search-box input::placeholder { color: var(--text3); }
+  .filter-select {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 7px 12px; color: var(--text2);
+    font-family: var(--sans); font-size: 13px; outline: none; cursor: pointer;
+  }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--surface2); }
+  th {
+    text-align: left; padding: 11px 16px;
+    font-size: 11px; color: var(--text3); font-family: var(--mono);
+    text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 13px 16px; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .quote-id { font-family: var(--mono); font-size: 12px; color: var(--text2); }
+  .client-cell { display: flex; align-items: center; gap: 10px; }
+  .client-avatar {
+    width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+  .client-name { font-weight: 500; }
+  .client-org { font-size: 11.5px; color: var(--text3); }
+  .amount { font-family: var(--mono); font-weight: 500; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 500;
+  }
+  .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; }
+  .badge-draft { background: var(--surface3); color: var(--text2); }
+  .badge-draft::before { background: var(--text3); }
+  .badge-sent { background: var(--accent-dim); color: var(--accent); }
+  .badge-sent::before { background: var(--accent); }
+  .badge-accepted { background: var(--accent2-dim); color: var(--accent2); }
+  .badge-accepted::before { background: var(--accent2); }
+  .badge-expired { background: var(--danger-dim); color: var(--danger); }
+  .badge-expired::before { background: var(--danger); }
+  .badge-review { background: var(--warn-dim); color: var(--warn); }
+  .badge-review::before { background: var(--warn); }
+  .row-actions { display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; }
+  tr:hover .row-actions { opacity: 1; }
+  .icon-btn {
+    width: 28px; height: 28px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border2); background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text2); transition: all 0.15s;
+  }
+  .icon-btn:hover { background: var(--surface3); color: var(--text); }
+
+  /* Panel / Drawer */
+  .panel-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 20; display: none; align-items: stretch; justify-content: flex-end;
+  }
+  .panel-overlay.open { display: flex; }
+  .panel {
+    width: 560px; background: var(--surface); border-left: 1px solid var(--border);
+    height: 100vh; overflow-y: auto; display: flex; flex-direction: column;
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .panel-header {
+    padding: 20px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surface); z-index: 1;
+  }
+  .panel-title { font-size: 15px; font-weight: 600; }
+  .panel-subtitle { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .panel-body { padding: 24px; flex: 1; display: flex; flex-direction: column; gap: 24px; }
+  .close-btn {
+    width: 30px; height: 30px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border2); background: none; color: var(--text2);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .close-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* Form */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label { font-size: 11.5px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
+  .form-input {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 9px 12px; color: var(--text);
+    font-family: var(--sans); font-size: 13px; outline: none; transition: border-color 0.15s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--text3); }
+  select.form-input { cursor: pointer; }
+
+  /* Line items */
+  .section-heading { font-size: 12px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .line-items { display: flex; flex-direction: column; gap: 8px; }
+  .line-item {
+    display: grid; grid-template-columns: 1fr 80px 100px 28px;
+    gap: 8px; align-items: center;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+  }
+  .line-item-name { font-size: 13px; font-weight: 500; }
+  .line-item-qty { font-family: var(--mono); font-size: 13px; text-align: center; }
+  .line-item-price { font-family: var(--mono); font-size: 13px; text-align: right; color: var(--accent2); }
+  .remove-item { cursor: pointer; color: var(--text3); background: none; border: none; display: flex; align-items: center; justify-content: center; }
+  .remove-item:hover { color: var(--danger); }
+  .add-line-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 12px; border: 1px dashed var(--border2); border-radius: var(--radius-sm);
+    color: var(--text3); font-size: 13px; cursor: pointer; transition: all 0.15s;
+    background: none; font-family: var(--sans); width: 100%;
+  }
+  .add-line-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  /* Summary */
+  .summary-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; color: var(--text2); }
+  .summary-total { font-size: 16px; font-weight: 600; color: var(--text); border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px; }
+  .summary-total span:last-child { color: var(--accent2); }
+
+  /* PDF preview badge */
+  .pdf-preview {
+    border: 1px dashed var(--border2); border-radius: var(--radius);
+    padding: 16px; display: flex; align-items: center; gap: 14px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .pdf-preview:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .pdf-icon { width: 40px; height: 48px; background: var(--danger-dim); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  .pdf-name { font-size: 13px; font-weight: 500; }
+  .pdf-meta { font-size: 11.5px; color: var(--text3); }
+
+  /* Panel footer */
+  .panel-footer {
+    padding: 16px 24px; border-top: 1px solid var(--border);
+    display: flex; gap: 10px; justify-content: flex-end;
+    position: sticky; bottom: 0; background: var(--surface);
+  }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 48px 24px; color: var(--text3); }
+  .empty-icon { font-size: 32px; margin-bottom: 10px; }
+  .empty-text { font-size: 14px; }
+
+  /* Pipeline view */
+  .pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .pipeline-col { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+  .pipeline-col-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .pipeline-col-title { font-size: 12px; font-weight: 500; }
+  .pipeline-count { font-size: 11px; font-family: var(--mono); background: var(--surface2); padding: 2px 7px; border-radius: 99px; color: var(--text3); }
+  .pipeline-card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s;
+  }
+  .pipeline-card:hover { border-color: var(--border2); }
+  .pipeline-card-id { font-family: var(--mono); font-size: 10.5px; color: var(--text3); margin-bottom: 4px; }
+  .pipeline-card-client { font-size: 12.5px; font-weight: 500; margin-bottom: 4px; }
+  .pipeline-card-amount { font-family: var(--mono); font-size: 11.5px; color: var(--accent2); }
+  .pipeline-card-date { font-size: 11px; color: var(--text3); margin-top: 6px; }
+
+  /* Notification dot */
+  .dot { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; }
+
+  /* Tooltip */
+  .tooltip-wrap { position: relative; }
+  .tooltip {
+    position: absolute; top: 110%; left: 50%; transform: translateX(-50%);
+    background: var(--surface3); border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); padding: 5px 10px; font-size: 11.5px;
+    white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 99;
+  }
+  .tooltip-wrap:hover .tooltip { opacity: 1; }
+
+  /* Client cards */
+  .client-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .client-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .client-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+  .client-card-avatar {
+    width: 42px; height: 42px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600;
+  }
+  .client-card-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .client-card-role { font-size: 11.5px; color: var(--text3); }
+  .client-card-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .client-card-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .client-card-meta-item { }
+  .client-card-meta-label { font-size: 10.5px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+  .client-card-meta-val { font-size: 12.5px; font-weight: 500; }
+  .client-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+  .client-status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+
+  /* Info row used in client detail panel */
+  .info-row {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 14px;
+  }
+  .info-row-label { font-size: 10.5px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .info-row-val { font-size: 13px; }
+
+  /* Interest tags */
+  .interest-tag {
+    padding: 5px 12px; border-radius: 99px; font-size: 12px;
+    border: 1px solid var(--border2); color: var(--text2); cursor: pointer;
+    transition: all 0.15s; background: var(--surface2);
+  }
+  .interest-tag.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+  .interest-tag:hover:not(.active) { border-color: var(--border2); color: var(--text); }
+
+  .badge-expiring { background: var(--warn-dim);    color: var(--warn);    }
+  .badge-expiring::before { background: var(--warn); }
+  .badge-churned  { background: var(--surface3);    color: var(--text3);   }
+  .badge-churned::before  { background: var(--text3); }
+
+  /* Subscription module toggle row */
+  .sub-mod-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); transition: border-color 0.15s;
+  }
+  .sub-mod-row.on { border-color: var(--accent2); background: var(--accent2-dim); }
+  .sub-mod-toggle {
+    width: 36px; height: 20px; border-radius: 99px; background: var(--border2);
+    position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+  }
+  .sub-mod-toggle.on { background: var(--accent2); }
+  .sub-mod-toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%; background: #fff;
+    transition: transform 0.2s;
+  }
+  .sub-mod-toggle.on::after { transform: translateX(16px); }
+
+  /* Plan badge colours */
+  .plan-starter   { background: var(--surface3);   color: var(--text2);  border: 1px solid var(--border2);            border-radius:4px; font-size:11px; padding:2px 7px; font-family:var(--mono); }
+  .plan-growth    { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(59,130,246,0.3);       border-radius:4px; font-size:11px; padding:2px 7px; font-family:var(--mono); }
+  .plan-enterprise{ background: var(--warn-dim);   color: var(--warn);   border: 1px solid rgba(245,158,11,0.3);       border-radius:4px; font-size:11px; padding:2px 7px; font-family:var(--mono); }
+
+  /* Invoice & subscription status badges */
+  .badge-paid     { background: var(--accent2-dim); color: var(--accent2); }
+  .badge-paid::before     { background: var(--accent2); }
+  .badge-overdue  { background: var(--danger-dim);  color: var(--danger);  }
+  .badge-overdue::before  { background: var(--danger); }
+  .badge-partial  { background: var(--warn-dim);    color: var(--warn);    }
+  .badge-partial::before  { background: var(--warn); }
+  .badge-expiring { background: var(--warn-dim);    color: var(--warn);    }
+  .badge-expiring::before { background: var(--warn); }
+  .badge-churned  { background: var(--surface3);    color: var(--text3);   }
+  .badge-churned::before  { background: var(--text3); }
+
+  /* Accounts */
+  .ledger-row { display:grid; grid-template-columns:120px 1fr 110px 100px 110px; gap:0; border-bottom:1px solid var(--border); align-items:center; }
+  .ledger-row:last-child { border-bottom:none; }
+  .ledger-cell { padding:11px 14px; font-size:13px; }
+  .ledger-head { background:var(--surface2); }
+  .ledger-head .ledger-cell { font-size:10.5px; color:var(--text3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.07em; padding:9px 14px; }
+  .ledger-cr { color:var(--accent2); font-family:var(--mono); }
+  .ledger-dr { color:var(--danger);  font-family:var(--mono); }
+  .ledger-bal{ font-family:var(--mono); font-weight:500; }
+  .acct-card { background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius); padding:18px 20px; }
+
+  @media (max-width: 900px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .pipeline { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">F</div>
+    <div>
+      <div class="logo-text">FluxWorks</div>
+      <div class="logo-sub">Admin Console</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Main</div>
+    <div class="nav-item" onclick="switchSection('dashboard',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item active" onclick="switchSection('quotations',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Quotations
+      <span class="nav-badge">12</span>
+    </div>
+    <div class="nav-item" onclick="switchSection('clients',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Clients
+    </div>
+    <div class="nav-item" onclick="switchSection('invoices',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      Invoices
+      <span class="nav-badge" style="background:var(--warn)">3</span>
+    </div>
+    <div class="nav-item" onclick="switchSection('subscriptions',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Subscriptions
+      <span class="nav-badge" style="background:var(--accent2)">5</span>
+    </div>
+    <div class="nav-item" onclick="switchSection('accounts',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Accounts
+    </div>
+    <div class="nav-section">Views</div>
+    <div class="nav-item" onclick="switchSection('pipeline',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="18"/><rect x="10" y="8" width="5" height="13"/><rect x="17" y="5" width="5" height="16"/></svg>
+      Pipeline
+    </div>
+    <div class="nav-section">Settings</div>
+    <div class="nav-item">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Integrations
+    </div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="avatar">VK</div>
+    <div>
+      <div class="avatar-name">Vanitha K</div>
+      <div class="avatar-role">Admin</div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-title" id="page-title">Quotations</div>
+    <div class="topbar-right" id="topbar-actions">
+      <button class="btn btn-ghost btn-sm" id="btn-preview-pdf" onclick="openPanel('preview')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Preview PDF
+      </button>
+      <button class="btn btn-primary" id="btn-new-quote" onclick="openPanel('new')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Quote
+      </button>
+      <button class="btn btn-primary" id="btn-add-client" style="display:none" onclick="openPanel('addclient')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Client
+      </button>
+      <button class="btn btn-primary" id="btn-new-invoice" style="display:none" onclick="openPanel('newinvoice')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Invoice
+      </button>
+      <button class="btn btn-primary" id="btn-new-sub" style="display:none" onclick="openPanel('newsub')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Subscription
+      </button>
+      <button class="btn btn-ghost btn-sm" id="btn-record-payment" style="display:none" onclick="openPanel('recordpayment')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Record payment
+      </button>
+    </div>
+  </header>
+
+  <!-- Quotations section -->
+  <div class="content" id="section-quotations">
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Total Quotes</div>
+        <div class="stat-val">48</div>
+        <div class="stat-change up">↑ 12% this month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Accepted</div>
+        <div class="stat-val" style="color:var(--accent2)">31</div>
+        <div class="stat-change up">↑ 64.6% win rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending</div>
+        <div class="stat-val" style="color:var(--warn)">12</div>
+        <div class="stat-change" style="color:var(--text3)">Awaiting response</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Value</div>
+        <div class="stat-val" style="color:var(--accent)">₹42L</div>
+        <div class="stat-change up">↑ 18% vs last month</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" onclick="filterTab(this,'all')">All <span style="color:var(--text3);margin-left:4px;font-size:11px">48</span></div>
+      <div class="tab" onclick="filterTab(this,'draft')">Draft <span style="color:var(--text3);margin-left:4px;font-size:11px">5</span></div>
+      <div class="tab" onclick="filterTab(this,'sent')">Sent <span style="color:var(--text3);margin-left:4px;font-size:11px">12</span></div>
+      <div class="tab" onclick="filterTab(this,'accepted')">Accepted <span style="color:var(--text3);margin-left:4px;font-size:11px">31</span></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input placeholder="Search by client, quote ID…" oninput="filterTable(this.value)"/>
+      </div>
+      <select class="filter-select">
+        <option>All Products</option>
+        <option>Pharmacy Suite</option>
+        <option>Clinic Suite</option>
+        <option>Retail Suite</option>
+      </select>
+      <select class="filter-select">
+        <option>All time</option>
+        <option>This month</option>
+        <option>Last 3 months</option>
+      </select>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Quote ID</th>
+            <th>Client</th>
+            <th>Product</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Expiry</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="quotes-tbody">
+          <!-- rows injected by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pipeline section (hidden by default) -->
+  <div class="content" id="section-pipeline" style="display:none">
+    <div class="pipeline" id="pipeline-view"></div>
+  </div>
+
+  <!-- Dashboard section -->
+  <div class="content" id="section-dashboard" style="display:none">
+    <div style="color:var(--text3);margin-top:60px;text-align:center">
+      <div style="font-size:32px;margin-bottom:12px">📊</div>
+      <div style="font-size:15px">Analytics dashboard coming soon</div>
+      <div style="font-size:13px;margin-top:6px">Switch to <strong style="color:var(--accent)">Quotations</strong> or <strong style="color:var(--accent)">Pipeline</strong> to get started</div>
+    </div>
+  </div>
+
+  <!-- Clients section -->
+  <div class="content" id="section-clients" style="display:none">
+
+    <!-- Client stats -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Total Clients</div>
+        <div class="stat-val">24</div>
+        <div class="stat-change up">↑ 4 this month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active</div>
+        <div class="stat-val" style="color:var(--accent2)">18</div>
+        <div class="stat-change up">Active subscriptions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg. Deal Size</div>
+        <div class="stat-val" style="color:var(--accent)">₹46K</div>
+        <div class="stat-change up">↑ 11% vs last quarter</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Revenue</div>
+        <div class="stat-val" style="color:var(--warn)">₹11.2L</div>
+        <div class="stat-change up">↑ 22% YoY</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input placeholder="Search clients…" oninput="filterClients(this.value)"/>
+      </div>
+      <select class="filter-select" onchange="filterClientsByProduct(this.value)">
+        <option value="">All Products</option>
+        <option value="Pharmacy">Pharmacy Suite</option>
+        <option value="Clinic">Clinic Suite</option>
+        <option value="Retail">Retail Suite</option>
+      </select>
+      <select class="filter-select" onchange="filterClientsByStatus(this.value)">
+        <option value="">All status</option>
+        <option value="active">Active</option>
+        <option value="prospect">Prospect</option>
+        <option value="churned">Churned</option>
+      </select>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <div class="icon-btn tooltip-wrap" id="view-grid-btn" onclick="setClientView('grid')" style="width:32px;height:32px;background:var(--accent-dim);color:var(--accent)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <span class="tooltip">Grid view</span>
+        </div>
+        <div class="icon-btn tooltip-wrap" id="view-list-btn" onclick="setClientView('list')" style="width:32px;height:32px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <span class="tooltip">List view</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grid view -->
+    <div id="clients-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px"></div>
+
+    <!-- List view -->
+    <div id="clients-list" style="display:none">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Product</th>
+              <th>Status</th>
+              <th>Total Billed</th>
+              <th>Quotes</th>
+              <th>Since</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="clients-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Invoices Section -->
+  <div class="content" id="section-invoices" style="display:none">
+
+    <!-- Invoice stats -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Total Invoiced</div>
+        <div class="stat-val" style="color:var(--accent)">₹8.4L</div>
+        <div class="stat-change up">↑ 18% this month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Paid</div>
+        <div class="stat-val" style="color:var(--accent2)">₹6.1L</div>
+        <div class="stat-change up">72.6% collection rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Overdue</div>
+        <div class="stat-val" style="color:var(--danger)">₹1.2L</div>
+        <div class="stat-change down">3 invoices overdue</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending</div>
+        <div class="stat-val" style="color:var(--warn)">₹1.1L</div>
+        <div class="stat-change" style="color:var(--text3)">Awaiting payment</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" onclick="filterInvTab(this,'all')">All <span style="color:var(--text3);margin-left:4px;font-size:11px">24</span></div>
+      <div class="tab" onclick="filterInvTab(this,'draft')">Draft <span style="color:var(--text3);margin-left:4px;font-size:11px">2</span></div>
+      <div class="tab" onclick="filterInvTab(this,'sent')">Sent <span style="color:var(--text3);margin-left:4px;font-size:11px">8</span></div>
+      <div class="tab" onclick="filterInvTab(this,'paid')">Paid <span style="color:var(--text3);margin-left:4px;font-size:11px">11</span></div>
+      <div class="tab" onclick="filterInvTab(this,'overdue')">Overdue <span style="color:var(--danger);margin-left:4px;font-size:11px">3</span></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input placeholder="Search invoice ID, client…" oninput="filterInvTable(this.value)"/>
+      </div>
+      <select class="filter-select">
+        <option>All time</option>
+        <option>This month</option>
+        <option>Last 3 months</option>
+        <option>This year</option>
+      </select>
+      <select class="filter-select">
+        <option>All products</option>
+        <option>Pharmacy Suite</option>
+        <option>Clinic Suite</option>
+        <option>Retail Suite</option>
+      </select>
+    </div>
+
+    <!-- Invoice table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice ID</th>
+            <th>Client</th>
+            <th>Quote ref.</th>
+            <th>Amount</th>
+            <th>GST</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Due date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="invoices-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<!-- Accounts Section -->
+  <div class="content" id="section-accounts" style="display:none">
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Total receivable</div>
+        <div class="stat-val" style="color:var(--accent)">₹3.6L</div>
+        <div class="stat-change" style="color:var(--text3)">Across all clients</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Collected</div>
+        <div class="stat-val" style="color:var(--accent2)">₹6.1L</div>
+        <div class="stat-change up">↑ This financial year</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Overdue</div>
+        <div class="stat-val" style="color:var(--danger)">₹1.4L</div>
+        <div class="stat-change down">4 clients outstanding</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Credit notes</div>
+        <div class="stat-val" style="color:var(--warn)">₹18,500</div>
+        <div class="stat-change" style="color:var(--text3)">Pending adjustment</div>
+      </div>
+    </div>
+
+    <!-- Two-column layout: client list + ledger detail -->
+    <div style="display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start">
+
+      <!-- Left: client account cards -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;padding:0 4px;margin-bottom:2px">Client accounts</div>
+
+        <div class="search-box" style="margin-bottom:4px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input placeholder="Search client…" oninput="filterAcctClients(this.value)" style="background:none;border:none;outline:none;color:var(--text);font-family:var(--sans);font-size:13px;width:100%"/>
+        </div>
+
+        <div id="acct-client-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
+      <!-- Right: ledger for selected client -->
+      <div id="acct-detail-panel">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <!-- Header -->
+          <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div id="acct-detail-name" style="font-size:15px;font-weight:600">Select a client to view ledger</div>
+              <div id="acct-detail-meta" style="font-size:12px;color:var(--text3);margin-top:2px"></div>
+            </div>
+            <div id="acct-detail-balance" style="text-align:right"></div>
+          </div>
+
+          <!-- Summary row -->
+          <div id="acct-summary-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border)"></div>
+
+          <!-- Ledger table -->
+          <div>
+            <div class="ledger-row ledger-head">
+              <div class="ledger-cell">Date</div>
+              <div class="ledger-cell">Description</div>
+              <div class="ledger-cell" style="text-align:right">Credit (₹)</div>
+              <div class="ledger-cell" style="text-align:right">Debit (₹)</div>
+              <div class="ledger-cell" style="text-align:right">Balance</div>
+            </div>
+            <div id="acct-ledger-rows" style="background:var(--surface)">
+              <div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">Select a client from the left to view their ledger</div>
+            </div>
+          </div>
+
+          <!-- Footer actions -->
+          <div id="acct-footer" style="display:none;padding:12px 16px;border-top:1px solid var(--border);display:none;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm">Export CSV</button>
+            <button class="btn btn-ghost btn-sm">Email statement</button>
+            <button class="btn btn-primary btn-sm" onclick="openPanel('recordpayment')">Record payment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- Record Payment Panel -->
+<div class="panel-overlay" id="panel-recordpayment" onclick="closePanel('recordpayment',event)">
+  <div class="panel" style="width:460px">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Record payment</div>
+        <div class="panel-subtitle" id="rp-subtitle">Mark an invoice as paid</div>
+      </div>
+      <button class="close-btn" onclick="closePanel('recordpayment',null,true)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+
+      <div class="form-group">
+        <label class="form-label">Client</label>
+        <select class="form-input" id="rp-client">
+          <option value="">— select client —</option>
+          <option>Apollo Pharmacy</option>
+          <option>Green Cross Clinic</option>
+          <option>MedPlus Pharma</option>
+          <option>City Hospital</option>
+          <option>Reliance Retail</option>
+          <option>Lifeline Hospital</option>
+          <option>Quick Mart</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Invoice reference</label>
+        <select class="form-input" id="rp-invoice">
+          <option value="">— select invoice —</option>
+          <option>INV-2025-024 · Apollo · ₹58,200</option>
+          <option>INV-2025-020 · Reliance · ₹82,000 (overdue)</option>
+          <option>INV-2025-019 · Wellness · ₹41,600 (overdue)</option>
+          <option>INV-2025-017 · Quick Mart · ₹38,750</option>
+          <option>INV-2025-016 · Apollo · ₹26,000 (partial)</option>
+          <option>INV-2025-015 · MedPlus · ₹45,000 (overdue)</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Amount received (₹)</label>
+          <input class="form-input" id="rp-amount" type="number" placeholder="0" style="font-family:var(--mono)" oninput="rpUpdateType()"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Payment date</label>
+          <input class="form-input" id="rp-date" type="date"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Payment mode</label>
+        <select class="form-input" id="rp-mode">
+          <option>Bank transfer / NEFT</option>
+          <option>UPI</option>
+          <option>Cheque</option>
+          <option>Cash</option>
+          <option>RTGS / IMPS</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Transaction / reference ID</label>
+        <input class="form-input" id="rp-ref" placeholder="e.g. UTR123456789" style="font-family:var(--mono);font-size:12px"/>
+      </div>
+
+      <!-- Payment type indicator -->
+      <div id="rp-type-banner" style="display:none;padding:10px 14px;border-radius:var(--radius-sm);font-size:12.5px;font-weight:500"></div>
+
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-input" rows="2" placeholder="Any notes about this payment…" style="resize:none"></textarea>
+      </div>
+
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="closePanel('recordpayment',null,true)">Cancel</button>
+      <button class="btn btn-primary" onclick="savePayment()">Save payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- Subscriptions Section -->
+  <div class="content" id="section-subscriptions" style="display:none">
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Active subs</div>
+        <div class="stat-val" style="color:var(--accent2)">18</div>
+        <div class="stat-change up">Across 14 clients</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">MRR</div>
+        <div class="stat-val" style="color:var(--accent)">₹2.4L</div>
+        <div class="stat-change up">↑ 8% this month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Expiring soon</div>
+        <div class="stat-val" style="color:var(--warn)">5</div>
+        <div class="stat-change" style="color:var(--text3)">Within 30 days</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Churned</div>
+        <div class="stat-val" style="color:var(--danger)">2</div>
+        <div class="stat-change down">This quarter</div>
+      </div>
+    </div>
+
+    <!-- Expiry alert banner -->
+    <div id="sub-expiry-banner" style="background:var(--warn-dim);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-sm);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span style="font-size:13px;color:var(--warn);font-weight:500">5 subscriptions expire within 30 days — send renewal quotes now</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="color:var(--warn);border-color:rgba(245,158,11,0.4)" onclick="filterSubTab(document.querySelector('#section-subscriptions .tab:nth-child(4)'),'expiring')">View expiring</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" onclick="filterSubTab(this,'all')">All <span style="color:var(--text3);margin-left:4px;font-size:11px">20</span></div>
+      <div class="tab" onclick="filterSubTab(this,'active')">Active <span style="color:var(--text3);margin-left:4px;font-size:11px">18</span></div>
+      <div class="tab" onclick="filterSubTab(this,'expiring')">Expiring <span style="color:var(--warn);margin-left:4px;font-size:11px">5</span></div>
+      <div class="tab" onclick="filterSubTab(this,'churned')">Churned <span style="color:var(--danger);margin-left:4px;font-size:11px">2</span></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input placeholder="Search client or module…" oninput="filterSubTable(this.value)"/>
+      </div>
+      <select class="filter-select">
+        <option>All suites</option>
+        <option>Pharmacy Suite</option>
+        <option>Clinic Suite</option>
+        <option>Retail Suite</option>
+      </select>
+      <select class="filter-select">
+        <option>All plans</option>
+        <option>Starter</option>
+        <option>Growth</option>
+        <option>Enterprise</option>
+      </select>
+    </div>
+
+    <!-- Subscriptions table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Suite & plan</th>
+            <th>Active modules</th>
+            <th>Billing cycle</th>
+            <th>MRR</th>
+            <th>Start date</th>
+            <th>Renewal</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="subs-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<!-- New Subscription Panel -->
+<div class="panel-overlay" id="panel-newsub" onclick="closePanel('newsub',event)">
+  <div class="panel" style="width:560px">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Add subscription</div>
+        <div class="panel-subtitle">Activate modules for a client</div>
+      </div>
+      <button class="close-btn" onclick="closePanel('newsub',null,true)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+
+      <!-- Client & plan -->
+      <div>
+        <div class="section-heading">Client & plan</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Client</label>
+            <select class="form-input" id="sub-client" onchange="subUpdateModules()">
+              <option value="">— select client —</option>
+              <option value="Apollo Pharmacy">Apollo Pharmacy</option>
+              <option value="Green Cross Clinic">Green Cross Clinic</option>
+              <option value="MedPlus Pharma">MedPlus Pharma</option>
+              <option value="City Hospital">City Hospital</option>
+              <option value="Lifeline Hospital">Lifeline Hospital</option>
+              <option value="Quick Mart">Quick Mart</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Plan</label>
+            <select class="form-input" id="sub-plan">
+              <option value="starter">Starter</option>
+              <option value="growth" selected>Growth</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:10px">
+          <div class="form-group">
+            <label class="form-label">Suite</label>
+            <select class="form-input" id="sub-suite" onchange="subUpdateModules()">
+              <option value="pharmacy">Pharmacy Management Suite</option>
+              <option value="clinic">Clinic Management Suite</option>
+              <option value="retail">Retail Suite</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Billing cycle</label>
+            <select class="form-input" id="sub-cycle" onchange="subRecalc()">
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="annual" selected>Annual</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active modules picker -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="section-heading" style="margin-bottom:0">Active modules</div>
+          <span style="font-size:11px;color:var(--text3)">Toggle to activate / deactivate</span>
+        </div>
+        <div id="sub-modules-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
+      <!-- Dates -->
+      <div>
+        <div class="section-heading">Dates</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Start date</label>
+            <input class="form-input" id="sub-start" type="date"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Renewal date</label>
+            <input class="form-input" id="sub-renewal" type="date"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pricing summary -->
+      <div class="summary-box">
+        <div class="summary-row"><span>Active modules</span><span id="sub-mod-count" style="font-family:var(--mono)">0 modules</span></div>
+        <div class="summary-row"><span>Base price</span><span id="sub-base" style="font-family:var(--mono)">₹0</span></div>
+        <div class="summary-row"><span>Billing cycle</span><span id="sub-cycle-label" style="font-family:var(--mono)">Annual</span></div>
+        <div class="summary-row summary-total"><span>MRR</span><span id="sub-mrr" style="color:var(--accent2)">₹0/mo</span></div>
+      </div>
+
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="closePanel('newsub',null,true)">Cancel</button>
+      <button class="btn btn-primary" onclick="closePanel('newsub',null,true)">Activate subscription</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Invoice Panel -->
+<div class="panel-overlay" id="panel-newinvoice" onclick="closePanel('newinvoice',event)">
+  <div class="panel" style="width:580px">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">New Invoice</div>
+        <div class="panel-subtitle">INV-2025-025 · Draft</div>
+      </div>
+      <button class="close-btn" onclick="closePanel('newinvoice',null,true)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+
+      <!-- From quote? -->
+      <div style="background:var(--accent-dim);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:12.5px;font-weight:500;color:var(--accent)">Convert from an accepted quote?</div>
+          <div style="font-size:11.5px;color:var(--text2);margin-top:2px">Pick a quote and all line items will be imported automatically</div>
+        </div>
+        <select class="form-input" id="inv-from-quote" style="width:180px;font-size:12px" onchange="loadFromQuote(this.value)">
+          <option value="">— select quote —</option>
+          <option value="QT-2025-047">QT-2025-047 · Green Cross</option>
+          <option value="QT-2025-046">QT-2025-046 · MedPlus</option>
+          <option value="QT-2025-042">QT-2025-042 · Lifeline</option>
+        </select>
+      </div>
+
+      <!-- Client -->
+      <div>
+        <div class="section-heading">Bill to</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Client name</label>
+            <input class="form-input" id="inv-client" placeholder="e.g. Apollo Pharmacy"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">GSTIN</label>
+            <input class="form-input" id="inv-gstin" placeholder="29AAAAA0000A1Z5" style="font-family:var(--mono);font-size:12px"/>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:10px">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="form-input" id="inv-email" type="email" placeholder="billing@client.com"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Due date</label>
+            <input class="form-input" id="inv-due" type="date"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Line items -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="section-heading" style="margin-bottom:0">Line items</div>
+          <button class="btn btn-ghost btn-sm" onclick="addInvItem()">+ Add item</button>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:var(--surface3)">
+                <th style="text-align:left;padding:8px 12px;font-size:10.5px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;font-weight:500">Description</th>
+                <th style="text-align:right;padding:8px 12px;font-size:10.5px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;font-weight:500">Qty</th>
+                <th style="text-align:right;padding:8px 12px;font-size:10.5px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;font-weight:500">Rate</th>
+                <th style="text-align:right;padding:8px 12px;font-size:10.5px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;font-weight:500">Amount</th>
+                <th style="width:32px"></th>
+              </tr>
+            </thead>
+            <tbody id="inv-items-body">
+              <tr class="inv-item-row" style="border-top:1px solid var(--border)">
+                <td style="padding:8px 12px"><input class="form-input" style="padding:5px 8px;font-size:12.5px" placeholder="Module / service description" oninput="recalcInv()"/></td>
+                <td style="padding:8px 12px;text-align:right"><input class="form-input" style="padding:5px 8px;font-size:12.5px;width:52px;text-align:center" type="number" value="1" oninput="recalcInv()"/></td>
+                <td style="padding:8px 12px;text-align:right"><input class="form-input" style="padding:5px 8px;font-size:12.5px;width:90px;text-align:right;font-family:var(--mono)" type="number" placeholder="0" oninput="recalcInv()"/></td>
+                <td style="padding:8px 12px;text-align:right;font-family:var(--mono);font-size:12.5px;color:var(--accent2)" id="inv-row-amt-0">₹0</td>
+                <td style="padding:8px 12px;text-align:center"><button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1" onclick="removeInvRow(this)">×</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tax & summary -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+        <div>
+          <div class="section-heading">Tax settings</div>
+          <div class="form-group">
+            <label class="form-label">GST rate</label>
+            <select class="form-input" id="inv-gst-rate" onchange="recalcInv()">
+              <option value="0">0% — Exempt</option>
+              <option value="5">5%</option>
+              <option value="12">12%</option>
+              <option value="18" selected>18% — Standard</option>
+              <option value="28">28%</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tax type</label>
+            <select class="form-input">
+              <option>IGST (Interstate)</option>
+              <option>CGST + SGST (Intrastate)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Discount (₹)</label>
+            <input class="form-input" id="inv-discount" type="number" value="0" oninput="recalcInv()" style="font-family:var(--mono)"/>
+          </div>
+        </div>
+        <div class="summary-box" style="margin-top:28px">
+          <div class="summary-row"><span>Subtotal</span><span style="font-family:var(--mono)" id="inv-subtotal">₹0</span></div>
+          <div class="summary-row"><span>Discount</span><span style="font-family:var(--mono);color:var(--accent2)" id="inv-disc-display">− ₹0</span></div>
+          <div class="summary-row"><span id="inv-gst-label">GST (18%)</span><span style="font-family:var(--mono)" id="inv-gst-display">₹0</span></div>
+          <div class="summary-row summary-total"><span>Total</span><span id="inv-total" style="color:var(--accent2)">₹0</span></div>
+        </div>
+      </div>
+
+      <!-- Payment terms -->
+      <div class="form-group">
+        <label class="form-label">Payment terms / notes</label>
+        <textarea class="form-input" rows="2" placeholder="e.g. Payment due within 30 days. Bank transfer preferred." style="resize:vertical"></textarea>
+      </div>
+
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="closePanel('newinvoice',null,true)">Cancel</button>
+      <button class="btn btn-ghost" style="color:var(--warn)">Save draft</button>
+      <button class="btn btn-ghost" style="color:var(--accent)">Preview PDF</button>
+      <button class="btn btn-primary">Send to client →</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Quote Panel -->
+<div class="panel-overlay" id="panel-new" onclick="closePanel('new',event)">
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">New Quotation</div>
+        <div class="panel-subtitle" id="new-quote-id">QT-2025-049 · Draft</div>
+      </div>
+      <button class="close-btn" onclick="closePanel('new',null,true)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+
+      <!-- Client -->
+      <div>
+        <div class="section-heading">Client details</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Client name</label>
+            <input class="form-input" placeholder="e.g. Apollo Pharmacy"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Organisation</label>
+            <input class="form-input" placeholder="Company or hospital name"/>
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:10px">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="form-input" type="email" placeholder="billing@client.com"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input class="form-input" placeholder="+91 98xxx xxxxx"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quote meta -->
+      <div>
+        <div class="section-heading">Quote details</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Product suite</label>
+            <select class="form-input" id="suite-select" onchange="onSuiteChange(this.value)">
+              <option value="pharmacy">Pharmacy Management Suite</option>
+              <option value="clinic">Clinic Management Suite</option>
+              <option value="retail">Retail Suite</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valid until</label>
+            <input class="form-input" type="date"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Core modules (auto-loaded per suite, individually removable) -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="section-heading" style="margin-bottom:0">Core modules</div>
+          <button class="add-line-btn" style="padding:4px 10px;font-size:11.5px;width:auto;margin:0" onclick="showCorePicker()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Restore module
+          </button>
+        </div>
+        <div id="core-modules-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div id="core-picker" style="display:none;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);margin-top:8px;overflow:hidden"></div>
+      </div>
+
+      <!-- Add-on modules -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="section-heading" style="margin-bottom:0">Add-on modules</div>
+          <span style="font-size:11px;color:var(--text3)">Optional extras</span>
+        </div>
+        <div id="addon-modules-list" style="display:flex;flex-direction:column;gap:6px"></div>
+
+        <!-- Custom module input -->
+        <div id="custom-module-input" style="margin-top:10px;display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:12px;flex-direction:column;gap:8px">
+          <div style="font-size:11.5px;color:var(--accent);font-weight:500;margin-bottom:2px">New custom module</div>
+          <div class="form-row" style="grid-template-columns:1fr 1fr 100px">
+            <div class="form-group">
+              <label class="form-label">Module name</label>
+              <input class="form-input" id="custom-mod-name" placeholder="e.g. Loyalty Program"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Suite mapping</label>
+              <select class="form-input" id="custom-mod-maps">
+                <option value="">— select suite —</option>
+                <option value="pharmacy">Pharmacy Management Suite</option>
+                <option value="clinic">Clinic Management Suite</option>
+                <option value="retail">Retail Suite</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Price (₹)</label>
+              <input class="form-input" id="custom-mod-price" type="number" placeholder="0" style="font-family:var(--mono)"/>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="hideCustomInput()">Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick="saveCustomModule()">Add module</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="add-line-btn" style="flex:1" onclick="showAddOnPicker()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add from catalogue
+          </button>
+          <button class="add-line-btn" style="flex:1" onclick="showCustomInput()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            Type a custom module
+          </button>
+        </div>
+
+        <!-- Add-on picker dropdown -->
+        <div id="addon-picker" style="display:none;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);margin-top:8px;overflow:hidden"></div>
+      </div>
+
+      <!-- Support & Training -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="section-heading" style="margin-bottom:0">Support &amp; training</div>
+          <span style="font-size:11px;color:var(--text3)">Optional — recommended</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px" id="support-items">
+
+          <div class="line-item" style="grid-template-columns:1fr 100px 110px 28px;background:var(--surface2);border-color:var(--border)">
+            <div>
+              <div class="line-item-name">Onboarding &amp; setup</div>
+              <div style="font-size:11px;color:var(--text3)">Initial installation, data migration, go-live</div>
+            </div>
+            <select id="sel-onboard" class="form-input" style="padding:4px 8px;font-size:12px;height:32px" onchange="recalc()"><option value="1">1 session</option>
+              <option value="2">2 sessions</option>
+              <option value="3">3 sessions</option>
+            </select>
+            <div class="line-item-price" id="sup-onboard-price">₹5,000</div>
+            <label style="display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <input type="checkbox" id="chk-onboard" checked onchange="recalc()" style="accent-color:var(--accent);width:14px;height:14px"/>
+            </label>
+          </div>
+
+          <div class="line-item" style="grid-template-columns:1fr 100px 110px 28px;background:var(--surface2);border-color:var(--border)">
+            <div>
+              <div class="line-item-name">Staff training</div>
+              <div style="font-size:11px;color:var(--text3)">On-site / remote training for end users</div>
+            </div>
+            <select id="sel-training" class="form-input" style="padding:4px 8px;font-size:12px;height:32px" onchange="recalc()"><option value="1">1 day</option>
+              <option value="2">2 days</option>
+              <option value="3">3 days</option>
+            </select>
+            <div class="line-item-price" id="sup-training-price">₹3,000</div>
+            <label style="display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <input type="checkbox" id="chk-training" checked onchange="recalc()" style="accent-color:var(--accent);width:14px;height:14px"/>
+            </label>
+          </div>
+
+          <div class="line-item" style="grid-template-columns:1fr 100px 110px 28px;background:var(--surface2);border-color:var(--border)">
+            <div>
+              <div class="line-item-name">AMC — Annual maintenance</div>
+              <div style="font-size:11px;color:var(--text3)">Bug fixes, updates, priority support</div>
+            </div>
+            <select id="sel-amc" class="form-input" style="padding:4px 8px;font-size:12px;height:32px" onchange="recalc()"><option value="1">1 year</option>
+              <option value="2">2 years</option>
+              <option value="3">3 years</option>
+            </select>
+            <div class="line-item-price" id="sup-amc-price">₹8,000</div>
+            <label style="display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <input type="checkbox" id="chk-amc" onchange="recalc()" style="accent-color:var(--accent);width:14px;height:14px"/>
+            </label>
+          </div>
+
+          <div class="line-item" style="grid-template-columns:1fr 100px 110px 28px;background:var(--surface2);border-color:var(--border)">
+            <div>
+              <div class="line-item-name">24/7 support plan</div>
+              <div style="font-size:11px;color:var(--text3)">Dedicated helpdesk + SLA response</div>
+            </div>
+            <select id="sel-support" class="form-input" style="padding:4px 8px;font-size:12px;height:32px" onchange="recalc()"><option value="6">6 months</option>
+              <option value="12">12 months</option>
+            </select>
+            <div class="line-item-price" id="sup-support-price">₹6,000</div>
+            <label style="display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <input type="checkbox" id="chk-support" onchange="recalc()" style="accent-color:var(--accent);width:14px;height:14px"/>
+            </label>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Summary (live) -->
+      <div class="summary-box">
+        <div class="summary-row"><span>Modules subtotal</span><span style="font-family:var(--mono)" id="sum-modules">₹0</span></div>
+        <div class="summary-row"><span>Support &amp; training</span><span style="font-family:var(--mono)" id="sum-support">₹0</span></div>
+        <div class="summary-row">
+          <span style="display:flex;align-items:center;gap:8px">
+            Discount
+            <input type="number" id="discount-input" value="0" min="0" style="width:70px;padding:3px 6px;font-size:12px;background:var(--surface3);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--mono)" oninput="recalc()"/>
+            <span style="font-size:11px;color:var(--text3)">₹</span>
+          </span>
+          <span style="font-family:var(--mono);color:var(--accent2)" id="sum-discount">− ₹0</span>
+        </div>
+        <div class="summary-row"><span>GST (18%)</span><span style="font-family:var(--mono)" id="sum-gst">₹0</span></div>
+        <div class="summary-row summary-total"><span>Total</span><span id="sum-total">₹0</span></div>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-group">
+        <label class="form-label">Notes to client</label>
+        <textarea class="form-input" rows="3" placeholder="Add any terms, conditions or notes…" style="resize:vertical"></textarea>
+      </div>
+
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="closePanel('new',null,true)">Cancel</button>
+      <button class="btn btn-ghost" style="color:var(--warn)">Save as draft</button>
+      <button class="btn btn-primary">Send to client →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Client Panel -->
+<div class="panel-overlay" id="panel-addclient" onclick="closePanel('addclient',event)">
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Add new client</div>
+        <div class="panel-subtitle">Fill in the client details below</div>
+      </div>
+      <button class="close-btn" onclick="closePanel('addclient',null,true)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+      <div>
+        <div class="section-heading">Contact info</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Contact name</label><input class="form-input" placeholder="e.g. Ravi Kumar"/></div>
+          <div class="form-group"><label class="form-label">Role / Designation</label><input class="form-input" placeholder="e.g. Procurement Head"/></div>
+        </div>
+        <div class="form-row" style="margin-top:10px">
+          <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" placeholder="contact@company.com"/></div>
+          <div class="form-group"><label class="form-label">Phone</label><input class="form-input" placeholder="+91 98xxx xxxxx"/></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-heading">Organisation</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Organisation name</label><input class="form-input" placeholder="Company / Hospital name"/></div>
+          <div class="form-group"><label class="form-label">Industry</label><select class="form-input"><option>Pharmacy</option><option>Healthcare / Clinic</option><option>Retail</option><option>Other</option></select></div>
+        </div>
+        <div class="form-row" style="margin-top:10px">
+          <div class="form-group"><label class="form-label">City</label><input class="form-input" placeholder="e.g. Chennai"/></div>
+          <div class="form-group"><label class="form-label">GST number</label><input class="form-input" placeholder="29AAAAA0000A1Z5" style="font-family:var(--mono);font-size:12px"/></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-heading">Interested in</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <div class="interest-tag active" onclick="toggleTag(this)">Pharmacy Suite</div>
+          <div class="interest-tag" onclick="toggleTag(this)">Clinic Suite</div>
+          <div class="interest-tag" onclick="toggleTag(this)">Retail Suite</div>
+          <div class="interest-tag" onclick="toggleTag(this)">POS &amp; Billing</div>
+          <div class="interest-tag" onclick="toggleTag(this)">Inventory</div>
+          <div class="interest-tag" onclick="toggleTag(this)">Online Ordering</div>
+          <div class="interest-tag" onclick="toggleTag(this)">HRMS</div>
+          <div class="interest-tag" onclick="toggleTag(this)">Analytics</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-input" rows="3" placeholder="Any relevant notes about this client…" style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="closePanel('addclient',null,true)">Cancel</button>
+      <button class="btn btn-primary" onclick="closePanel('addclient',null,true)">Save client</button>
+    </div>
+  </div>
+</div>
+
+<!-- Client Detail Panel -->
+<div class="panel-overlay" id="panel-clientdetail" onclick="closePanel('clientdetail',event)">
+  <div class="panel" style="width:600px">
+    <div class="panel-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="cd-avatar" class="client-avatar" style="width:40px;height:40px;border-radius:10px;font-size:15px;flex-shrink:0"></div>
+        <div>
+          <div class="panel-title" id="cd-name"></div>
+          <div class="panel-subtitle" id="cd-org"></div>
+        </div>
+      </div>
+      <button class="close-btn" onclick="closePanel('clientdetail',null,true)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="cd-info-grid"></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="cd-stats"></div>
+      <div>
+        <div class="section-heading">Quote history</div>
+        <div class="table-wrap">
+          <table><thead><tr><th>ID</th><th>Product</th><th>Amount</th><th>Status</th><th>Expiry</th></tr></thead>
+          <tbody id="cd-quotes-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-ghost" onclick="closePanel('clientdetail',null,true)">Close</button>
+      <button class="btn btn-ghost" onclick="closePanel('clientdetail',null,true);openPanel('new')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        New quote for client
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF Preview Panel -->
+<div class="panel-overlay" id="panel-preview" onclick="closePanel('preview',event)">
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Quote preview</div>
+        <div class="panel-subtitle">QT-2025-043 · MedPlus Pharma</div>
+      </div>
+      <button class="close-btn" onclick="closePanel('preview',null,true)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+      <!-- Simulated PDF -->
+      <div style="background:#fff;border-radius:var(--radius);padding:28px;color:#1a1a2e;font-family:var(--sans)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
+          <div>
+            <div style="font-size:20px;font-weight:700;color:#1a1a2e;letter-spacing:-0.5px">FluxWorks</div>
+            <div style="font-size:11px;color:#888;margin-top:2px">Software Solutions</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:700;color:#3b82f6">QUOTATION</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">QT-2025-043</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;font-size:12.5px">
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#aaa;margin-bottom:4px">Bill to</div>
+            <div style="font-weight:600">MedPlus Pharma Pvt Ltd</div>
+            <div style="color:#555"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="d2a2a0bdb1a7a0b7bfb7bca692bfb7b6a2bea7a1fcbbbc">[email&#160;protected]</a></div>
+            <div style="color:#555">+91 98765 43210</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#aaa;margin-bottom:4px">Details</div>
+            <div style="color:#555">Date: Mar 19, 2025</div>
+            <div style="color:#555">Expiry: Apr 19, 2025</div>
+            <div style="font-weight:600;color:#10b981;margin-top:4px">Valid for 30 days</div>
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:20px">
+          <thead>
+            <tr style="background:#f4f6fa">
+              <th style="text-align:left;padding:8px 10px;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em">Module</th>
+              <th style="text-align:center;padding:8px 10px;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em">Qty</th>
+              <th style="text-align:right;padding:8px 10px;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid #f0f0f0"><td style="padding:9px 10px">Pharmacy POS & Billing</td><td style="text-align:center;padding:9px 10px">1</td><td style="text-align:right;padding:9px 10px;font-family:var(--mono)">₹18,000</td></tr>
+            <tr style="border-bottom:1px solid #f0f0f0"><td style="padding:9px 10px">Inventory Management</td><td style="text-align:center;padding:9px 10px">1</td><td style="text-align:right;padding:9px 10px;font-family:var(--mono)">₹14,000</td></tr>
+            <tr><td style="padding:9px 10px">Online Ordering Portal</td><td style="text-align:center;padding:9px 10px">1</td><td style="text-align:right;padding:9px 10px;font-family:var(--mono)">₹12,000</td></tr>
+          </tbody>
+        </table>
+        <div style="display:flex;justify-content:flex-end">
+          <div style="width:220px;font-size:12.5px">
+            <div style="display:flex;justify-content:space-between;padding:4px 0;color:#555"><span>Subtotal</span><span>₹44,000</span></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;color:#555"><span>GST (18%)</span><span>₹7,920</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #1a1a2e;margin-top:6px;font-weight:700;font-size:14px"><span>Total</span><span style="color:#3b82f6">₹51,920</span></div>
+          </div>
+        </div>
+        <div style="margin-top:20px;padding:12px;background:#f4f6fa;border-radius:6px;font-size:11.5px;color:#666">
+          This quotation is valid for 30 days from the date of issue. Prices are subject to change upon renewal.
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" style="flex:1">📋 Copy share link</button>
+        <button class="btn btn-primary" style="flex:1">⬇ Download PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Quote data ────────────────────────────────────────────────────────────────
+const quotes = [
+  { id:'QT-2025-048', client:'Apollo Pharmacy',   org:'Apollo Health',       product:'Pharmacy Suite', amount:'₹58,200', status:'sent',     expiry:'Apr 10, 2025', color:'#3b82f6' },
+  { id:'QT-2025-047', client:'Green Cross Clinic', org:'GCC Healthcare',     product:'Clinic Suite',   amount:'₹34,500', status:'accepted', expiry:'Apr 5, 2025',  color:'#10b981' },
+  { id:'QT-2025-046', client:'MedPlus Pharma',    org:'MedPlus Pvt Ltd',    product:'Pharmacy Suite', amount:'₹51,920', status:'accepted', expiry:'Apr 19, 2025', color:'#8b5cf6' },
+  { id:'QT-2025-045', client:'City Hospital',     org:'City Health Group',  product:'Clinic Suite',   amount:'₹29,000', status:'draft',    expiry:'—',            color:'#f59e0b' },
+  { id:'QT-2025-044', client:'Reliance Retail',   org:'Reliance Industries',product:'Retail Suite',   amount:'₹82,000', status:'review',   expiry:'Mar 28, 2025', color:'#ef4444' },
+  { id:'QT-2025-043', client:'Wellness First',    org:'WF Pharma',          product:'Pharmacy Suite', amount:'₹41,600', status:'expired',  expiry:'Mar 1, 2025',  color:'#6b7280' },
+  { id:'QT-2025-042', client:'Lifeline Hospital', org:'Lifeline Trust',     product:'Clinic Suite',   amount:'₹55,000', status:'accepted', expiry:'Apr 22, 2025', color:'#10b981' },
+  { id:'QT-2025-041', client:'Quick Mart',        org:'Quick Retail Chain', product:'Retail Suite',   amount:'₹38,750', status:'sent',     expiry:'Apr 8, 2025',  color:'#f59e0b' },
+];
+const statusBadge = { draft:'badge-draft', sent:'badge-sent', accepted:'badge-accepted', expired:'badge-expired', review:'badge-review' };
+const statusLabel = { draft:'Draft', sent:'Sent', accepted:'Accepted', expired:'Expired', review:'In Review' };
+
+// ── Quotes table ───────────────────────────────────────────────────────────────
+function renderTable(data) {
+  const tbody = document.getElementById('quotes-tbody');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty"><div class="empty-icon">📄</div><div class="empty-text">No quotations found</div></td></tr>'; return; }
+  tbody.innerHTML = data.map(q => `
+    <tr>
+      <td><span class="quote-id">${q.id}</span></td>
+      <td>
+        <div class="client-cell">
+          <div class="client-avatar" style="background:${q.color}22;color:${q.color}">${q.client.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+          <div><div class="client-name">${q.client}</div><div class="client-org">${q.org}</div></div>
+        </div>
+      </td>
+      <td style="color:var(--text2)">${q.product}</td>
+      <td><span class="amount">${q.amount}</span></td>
+      <td><span class="badge ${statusBadge[q.status]}">${statusLabel[q.status]}</span></td>
+      <td style="color:var(--text3);font-size:12.5px">${q.expiry}</td>
+      <td>
+        <div class="row-actions">
+          <div class="icon-btn tooltip-wrap" onclick="openPanel('preview')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span class="tooltip">Preview</span>
+          </div>
+          <div class="icon-btn tooltip-wrap">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span class="tooltip">Edit</span>
+          </div>
+          <div class="icon-btn tooltip-wrap">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+            <span class="tooltip">Send</span>
+          </div>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+function filterTable(q) { renderTable(quotes.filter(r => r.client.toLowerCase().includes(q.toLowerCase()) || r.id.toLowerCase().includes(q.toLowerCase()))); }
+function filterTab(el, status) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderTable(status === 'all' ? quotes : quotes.filter(q => q.status === status));
+}
+
+// ── Pipeline ───────────────────────────────────────────────────────────────────
+function renderPipeline() {
+  const stages = ['draft','review','sent','accepted','expired'];
+  const labels  = { draft:'Draft', review:'In Review', sent:'Sent', accepted:'Accepted', expired:'Expired' };
+  document.getElementById('pipeline-view').innerHTML = stages.map(s => {
+    const qs = quotes.filter(q => q.status === s);
+    return `<div class="pipeline-col">
+      <div class="pipeline-col-header"><span class="pipeline-col-title">${labels[s]}</span><span class="pipeline-count">${qs.length}</span></div>
+      ${qs.map(q => `<div class="pipeline-card"><div class="pipeline-card-id">${q.id}</div><div class="pipeline-card-client">${q.client}</div><div class="pipeline-card-amount">${q.amount}</div><div class="pipeline-card-date">${q.product}</div></div>`).join('') || '<div style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">Empty</div>'}
+    </div>`;
+  }).join('');
+}
+
+// ── Section switching ──────────────────────────────────────────────────────────
+function switchSection(name, clickedEl) {
+  ['quotations','pipeline','dashboard','clients','invoices','subscriptions','accounts'].forEach(s => {
+    document.getElementById('section-' + s).style.display = s === name ? '' : 'none';
+  });
+  document.getElementById('page-title').textContent = name.charAt(0).toUpperCase() + name.slice(1);
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (clickedEl) clickedEl.classList.add('active');
+
+  const isClients  = name === 'clients';
+  const isInvoices = name === 'invoices';
+  const isSubs     = name === 'subscriptions';
+  const isAccounts = name === 'accounts';
+  document.getElementById('btn-preview-pdf').style.display    = (isClients||isInvoices||isSubs||isAccounts) ? 'none' : '';
+  document.getElementById('btn-new-quote').style.display      = (isClients||isInvoices||isSubs||isAccounts) ? 'none' : '';
+  document.getElementById('btn-add-client').style.display     = isClients  ? '' : 'none';
+  document.getElementById('btn-new-invoice').style.display    = isInvoices ? '' : 'none';
+  document.getElementById('btn-new-sub').style.display        = isSubs     ? '' : 'none';
+  document.getElementById('btn-record-payment').style.display = isAccounts ? '' : 'none';
+
+  if (name === 'pipeline')      renderPipeline();
+  if (name === 'clients')       renderClients(filteredClients);
+  if (name === 'invoices')      renderInvTable(invoices);
+  if (name === 'subscriptions') { renderSubTable(subscriptions); setTimeout(subUpdateModules, 50); }
+  if (name === 'accounts')      { selectedAcctClient = null; renderAcctClientList(); }
+}
+
+// ── Panels ─────────────────────────────────────────────────────────────────────
+function openPanel(id) {
+  document.getElementById('panel-' + id).classList.add('open');
+  if (id === 'new')    initNewQuotePanel();
+  if (id === 'newsub') { subActiveModules = new Set(); subUpdateModules(); }
+}
+function closePanel(id, e, force) {
+  if (force || !e || e.target === document.getElementById('panel-' + id)) {
+    document.getElementById('panel-' + id).classList.remove('open');
+  }
+}
+
+// ── Suite & module catalogue ───────────────────────────────────────────────────
+const SUITE_CATALOGUE = {
+  pharmacy: {
+    label: 'Pharmacy Management Suite',
+    core: [
+      { id:'ph-outlet',  name:'Outlet Management',   price:12000, desc:'Multi-outlet setup, branch control' },
+      { id:'ph-pos',     name:'POS & Billing',        price:18000, desc:'Counter sales, receipts, barcode' },
+      { id:'ph-admin',   name:'Admin Panel',          price:10000, desc:'Centralised dashboard & reports' },
+      { id:'ph-user',    name:'User Management',      price:8000,  desc:'Roles, permissions, staff login' },
+      { id:'ph-del',     name:'Delivery App',         price:9000,  desc:'Driver app, route & status tracking' },
+    ],
+    addons: [
+      { id:'ph-inv',      name:'Inventory Management', price:14000, desc:'Stock, reorder, expiry alerts' },
+      { id:'ph-online',   name:'Online Ordering',      price:12000, desc:'Web & mobile ordering portal' },
+      { id:'ph-hrms',     name:'HRMS',                 price:10000, desc:'Attendance, payroll, leaves' },
+      { id:'ph-loyalty',  name:'Loyalty Program',      price:7000,  desc:'Points, offers, customer rewards' },
+      { id:'ph-analytics',name:'Analytics Dashboard',  price:11000, desc:'Sales insights, trend reports' },
+    ]
+  },
+  clinic: {
+    label: 'Clinic Management Suite',
+    core: [
+      { id:'cl-emr',     name:'EMR / Patient Records', price:15000, desc:'Digital health records, history' },
+      { id:'cl-appt',    name:'Appointments',          price:10000, desc:'Scheduling, reminders, calendar' },
+      { id:'cl-billing', name:'Billing & Invoicing',   price:12000, desc:'OPD/IPD billing, insurance' },
+      { id:'cl-user',    name:'User Management',       price:8000,  desc:'Doctors, nurses, admin roles' },
+    ],
+    addons: [
+      { id:'cl-rx',       name:'Digital Prescription',  price:9000,  desc:'e-Rx, drug interaction checks' },
+      { id:'cl-lab',      name:'Lab Integration',       price:11000, desc:'Test requests, results, reports' },
+      { id:'cl-tele',     name:'Teleconsultation',      price:13000, desc:'Video call, online consultation' },
+      { id:'cl-pharma',   name:'In-house Pharmacy',     price:14000, desc:'Clinic-attached pharmacy module' },
+      { id:'cl-analytics',name:'Analytics Dashboard',   price:10000, desc:'Patient, revenue & OPD reports' },
+    ]
+  },
+  retail: {
+    label: 'Retail Suite',
+    core: [
+      { id:'rt-pos',   name:'POS & Billing',        price:18000, desc:'Counter, receipt, multi-tender' },
+      { id:'rt-inv',   name:'Inventory Management', price:14000, desc:'Stock sync, reorder, variants' },
+      { id:'rt-user',  name:'User Management',      price:8000,  desc:'Staff roles, shift management' },
+      { id:'rt-admin', name:'Admin Panel',          price:10000, desc:'Multi-store dashboard & control' },
+    ],
+    addons: [
+      { id:'rt-online',   name:'Online Ordering',     price:12000, desc:'E-commerce / delivery portal' },
+      { id:'rt-crm',      name:'CRM',                 price:9000,  desc:'Customer profiles, purchase history' },
+      { id:'rt-loyalty',  name:'Loyalty Program',     price:7000,  desc:'Points, campaigns, vouchers' },
+      { id:'rt-hrms',     name:'HRMS',                price:10000, desc:'Payroll, attendance, leaves' },
+      { id:'rt-analytics',name:'Analytics Dashboard', price:11000, desc:'Sales, margins, product reports' },
+    ]
+  }
+};
+
+let customModules = [];
+let activeAddons   = new Set();
+let currentSuite   = 'pharmacy';
+
+const SUPPORT_BASE = { onboard:5000, training:3000, amc:8000, support:6000 };
+
+function fmt(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
+function xSvg()  { return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`; }
+
+function getAllAddons() {
+  const suite = SUITE_CATALOGUE[currentSuite];
+  return [...suite.addons, ...customModules.filter(c => c.suite === currentSuite)];
+}
+
+let removedCores = new Set(); // tracks removed core module ids
+
+function renderCoreModules() {
+  const suite = SUITE_CATALOGUE[currentSuite];
+  const active = suite.core.filter(m => !removedCores.has(m.id));
+  document.getElementById('core-modules-list').innerHTML = active.length
+    ? active.map(m => `
+        <div class="line-item" style="background:var(--surface2);border-color:var(--border)">
+          <div><div class="line-item-name">${m.name}</div><div style="font-size:11px;color:var(--text3)">${m.desc}</div></div>
+          <div style="font-size:11px;color:var(--accent);background:var(--accent-dim);border-radius:4px;padding:2px 6px;white-space:nowrap">Core</div>
+          <div class="line-item-price">${fmt(m.price)}</div>
+          <button class="remove-item" onclick="removeCoreModule('${m.id}')" title="Remove from quote">${xSvg()}</button>
+        </div>`).join('')
+    : `<div style="font-size:12px;color:var(--text3);padding:6px 2px">All core modules removed. Use "Restore module" to add back.</div>`;
+  recalc();
+}
+
+function removeCoreModule(id) {
+  removedCores.add(id);
+  document.getElementById('core-picker').style.display = 'none';
+  renderCoreModules();
+}
+
+function showCorePicker() {
+  const picker = document.getElementById('core-picker');
+  if (picker.style.display !== 'none') { picker.style.display = 'none'; return; }
+  const suite    = SUITE_CATALOGUE[currentSuite];
+  const removed  = suite.core.filter(m => removedCores.has(m.id));
+  if (!removed.length) {
+    picker.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:var(--text3)">All core modules are already in the quote.</div>';
+  } else {
+    picker.innerHTML = removed.map(m => `
+      <div onclick="restoreCoreModule('${m.id}')" style="padding:9px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)"
+           onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${m.name}</div>
+          <div style="font-size:11.5px;color:var(--text3)">${m.desc}</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:12.5px;color:var(--accent2);flex-shrink:0;margin-left:12px">${fmt(m.price)}</div>
+      </div>`).join('');
+  }
+  picker.style.display = '';
+}
+
+function restoreCoreModule(id) {
+  removedCores.delete(id);
+  document.getElementById('core-picker').style.display = 'none';
+  renderCoreModules();
+}
+
+function populateCustomMapSelect() {
+  // suite mapping — always show all 3 suites, pre-select current
+  const sel = document.getElementById('custom-mod-maps');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— select suite —</option>' +
+    Object.entries(SUITE_CATALOGUE).map(([key, s]) =>
+      `<option value="${key}"${key === currentSuite ? ' selected' : ''}>${s.label}</option>`
+    ).join('');
+}
+function renderAddonModules() {
+  const active = getAllAddons().filter(m => activeAddons.has(m.id));
+  document.getElementById('addon-modules-list').innerHTML = active.length
+    ? active.map(m => `
+        <div class="line-item" style="background:var(--surface2);border-color:var(--border)">
+          <div>
+            <div class="line-item-name">${m.name}${m.custom ? ' <span style="font-size:10px;color:var(--warn);background:var(--warn-dim);padding:1px 6px;border-radius:99px;margin-left:4px">custom</span>' : ''}</div>
+            <div style="font-size:11px;color:var(--text3)">${m.mapsTo ? 'Suite: ' + m.mapsTo : m.desc || ''}</div>
+          </div>
+          <div style="font-size:11px;color:var(--text3);white-space:nowrap">Add-on</div>
+          <div class="line-item-price">${fmt(m.price)}</div>
+          <button class="remove-item" onclick="removeAddon('${m.id}')">${xSvg()}</button>
+        </div>`)
+      .join('')
+    : `<div style="font-size:12px;color:var(--text3);padding:6px 2px">No add-ons selected yet.</div>`;
+  recalc();
+}
+
+function removeAddon(id) { activeAddons.delete(id); renderAddonModules(); }
+
+function onSuiteChange(val) {
+  currentSuite = val;
+  activeAddons.clear();
+  removedCores.clear();
+  renderCoreModules();
+  renderAddonModules();
+  document.getElementById('addon-picker').style.display = 'none';
+  document.getElementById('core-picker').style.display  = 'none';
+  hideCustomInput();
+  populateCustomMapSelect();
+  recalc();
+}
+
+
+
+function showAddOnPicker() {
+  const picker = document.getElementById('addon-picker');
+  if (picker.style.display !== 'none') { picker.style.display = 'none'; return; }
+  const available = getAllAddons().filter(m => !activeAddons.has(m.id));
+  if (!available.length) {
+    picker.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:var(--text3)">All add-ons already added.</div>';
+  } else {
+    picker.innerHTML = available.map(m => `
+      <div onclick="pickAddon('${m.id}')" style="padding:9px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)"
+           onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background=''">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${m.name}</div>
+          <div style="font-size:11.5px;color:var(--text3)">${m.desc || ''}</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:12.5px;color:var(--accent2);flex-shrink:0;margin-left:12px">${fmt(m.price)}</div>
+      </div>`).join('');
+  }
+  picker.style.display = '';
+}
+
+function pickAddon(id) {
+  activeAddons.add(id);
+  document.getElementById('addon-picker').style.display = 'none';
+  renderAddonModules();
+}
+
+function showCustomInput() {
+  const el = document.getElementById('custom-module-input');
+  el.style.display = 'flex';
+  populateCustomMapSelect();
+  document.getElementById('custom-mod-name').focus();
+}
+
+function hideCustomInput() {
+  const el = document.getElementById('custom-module-input');
+  if (el) {
+    el.style.display = 'none';
+    document.getElementById('custom-mod-name').value  = '';
+    document.getElementById('custom-mod-price').value = '';
+  }
+}
+
+function saveCustomModule() {
+  const name     = document.getElementById('custom-mod-name').value.trim();
+  const price    = parseInt(document.getElementById('custom-mod-price').value) || 0;
+  const suiteKey = document.getElementById('custom-mod-maps').value;
+  if (!name) { document.getElementById('custom-mod-name').focus(); return; }
+  const suiteName = suiteKey ? SUITE_CATALOGUE[suiteKey]?.label : '';
+  const id = 'custom-' + Date.now();
+  // store against whichever suite was mapped (or current if none selected)
+  const targetSuite = suiteKey || currentSuite;
+  customModules.push({ id, name, price, mapsTo: suiteName, suite: targetSuite, desc: suiteName ? 'Suite: ' + suiteName : '', custom: true });
+  activeAddons.add(id);
+  hideCustomInput();
+  renderAddonModules();
+}
+
+// ── Recalc (support IDs used directly — no fragile nth-of-type) ───────────────
+function getSupNum(selId) { const el = document.getElementById(selId); return el ? parseFloat(el.value) || 0 : 0; }
+function getChk(id)       { const el = document.getElementById(id);    return el ? el.checked : false; }
+
+function recalc() {
+  const suite     = SUITE_CATALOGUE[currentSuite];
+  const allAddons = getAllAddons();
+  const coreTotal = suite.core
+    .filter(m => !removedCores.has(m.id))
+    .reduce((s, m) => s + m.price, 0);
+  const addonTotal= [...activeAddons].reduce((s, id) => {
+    const m = allAddons.find(x => x.id === id);
+    return s + (m ? m.price : 0);
+  }, 0);
+  const modulesTotal = coreTotal + addonTotal;
+
+  const onboard  = getChk('chk-onboard')  ? SUPPORT_BASE.onboard  * (getSupNum('sel-onboard')  || 1) : 0;
+  const training = getChk('chk-training') ? SUPPORT_BASE.training * (getSupNum('sel-training') || 1) : 0;
+  const amc      = getChk('chk-amc')      ? SUPPORT_BASE.amc      * (getSupNum('sel-amc')      || 1) : 0;
+  const support  = getChk('chk-support')  ? SUPPORT_BASE.support  * (getSupNum('sel-support')  || 6) / 6 : 0;
+  const supportTotal = onboard + training + amc + support;
+
+  // update price labels (show base when unchecked)
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = fmt(val); };
+  set('sup-onboard-price',  getChk('chk-onboard')  ? onboard  : SUPPORT_BASE.onboard);
+  set('sup-training-price', getChk('chk-training') ? training : SUPPORT_BASE.training);
+  set('sup-amc-price',      getChk('chk-amc')      ? amc      : SUPPORT_BASE.amc);
+  set('sup-support-price',  getChk('chk-support')  ? support  : SUPPORT_BASE.support);
+
+  const discount  = parseInt(document.getElementById('discount-input')?.value) || 0;
+  const subtotal  = modulesTotal + supportTotal;
+  const afterDisc = Math.max(0, subtotal - discount);
+  const gst       = Math.round(afterDisc * 0.18);
+  const total     = afterDisc + gst;
+
+  set('sum-modules',  modulesTotal);
+  set('sum-support',  supportTotal);
+  set('sum-gst',      gst);
+  set('sum-total',    total);
+  const discEl = document.getElementById('sum-discount');
+  if (discEl) discEl.textContent = '− ' + fmt(discount);
+}
+
+function initNewQuotePanel() {
+  currentSuite = 'pharmacy';
+  activeAddons.clear();
+  removedCores.clear();
+  customModules = [];
+  const ss = document.getElementById('suite-select');
+  if (ss) ss.value = 'pharmacy';
+  renderCoreModules();
+  renderAddonModules();
+  populateCustomMapSelect();
+  const di = document.getElementById('discount-input');
+  if (di) di.value = '0';
+  document.getElementById('core-picker').style.display  = 'none';
+  document.getElementById('addon-picker').style.display = 'none';
+  recalc();
+}
+
+function toggleTag(el) { el.classList.toggle('active'); }
+
+// ── Invoice data ───────────────────────────────────────────────────────────────
+const invoices = [
+  { id:'INV-2025-024', client:'Apollo Pharmacy',   org:'Apollo Health',       quoteRef:'QT-2025-048', amount:'₹49,322', gst:'₹8,878', total:'₹58,200', status:'sent',    due:'Apr 15, 2025', color:'#3b82f6' },
+  { id:'INV-2025-023', client:'Green Cross Clinic',org:'GCC Healthcare',      quoteRef:'QT-2025-047', amount:'₹29,237', gst:'₹5,263', total:'₹34,500', status:'paid',    due:'Apr 5, 2025',  color:'#10b981' },
+  { id:'INV-2025-022', client:'MedPlus Pharma',    org:'MedPlus Pvt Ltd',     quoteRef:'QT-2025-046', amount:'₹44,000', gst:'₹7,920', total:'₹51,920', status:'paid',    due:'Mar 30, 2025', color:'#8b5cf6' },
+  { id:'INV-2025-021', client:'City Hospital',     org:'City Health Group',   quoteRef:'QT-2025-045', amount:'₹24,576', gst:'₹4,424', total:'₹29,000', status:'draft',   due:'—',            color:'#f59e0b' },
+  { id:'INV-2025-020', client:'Reliance Retail',   org:'Reliance Industries', quoteRef:'QT-2025-044', amount:'₹69,492', gst:'₹12,508',total:'₹82,000', status:'overdue', due:'Mar 10, 2025', color:'#ef4444' },
+  { id:'INV-2025-019', client:'Wellness First',    org:'WF Pharma',           quoteRef:'QT-2025-043', amount:'₹35,254', gst:'₹6,346', total:'₹41,600', status:'overdue', due:'Mar 1, 2025',  color:'#6b7280' },
+  { id:'INV-2025-018', client:'Lifeline Hospital', org:'Lifeline Trust',      quoteRef:'QT-2025-042', amount:'₹46,610', gst:'₹8,390', total:'₹55,000', status:'paid',    due:'Apr 10, 2025', color:'#10b981' },
+  { id:'INV-2025-017', client:'Quick Mart',        org:'Quick Retail Chain',  quoteRef:'QT-2025-041', amount:'₹32,839', gst:'₹5,911', total:'₹38,750', status:'sent',    due:'Apr 20, 2025', color:'#f59e0b' },
+  { id:'INV-2025-016', client:'Apollo Pharmacy',   org:'Apollo Health',       quoteRef:'QT-2025-036', amount:'₹22,034', gst:'₹3,966', total:'₹26,000', status:'partial', due:'Apr 18, 2025', color:'#3b82f6' },
+  { id:'INV-2025-015', client:'MedPlus Pharma',    org:'MedPlus Pvt Ltd',     quoteRef:'QT-2025-032', amount:'₹38,136', gst:'₹6,864', total:'₹45,000', status:'overdue', due:'Feb 28, 2025', color:'#8b5cf6' },
+];
+
+const invStatusBadge = { draft:'badge-draft', sent:'badge-sent', paid:'badge-paid', overdue:'badge-overdue', partial:'badge-partial' };
+const invStatusLabel = { draft:'Draft', sent:'Sent', paid:'Paid', overdue:'Overdue', partial:'Partial' };
+
+function renderInvTable(data) {
+  const tbody = document.getElementById('invoices-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty"><div class="empty-icon">🧾</div><div class="empty-text">No invoices found</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(inv => `
+    <tr>
+      <td><span class="quote-id">${inv.id}</span></td>
+      <td>
+        <div class="client-cell">
+          <div class="client-avatar" style="background:${inv.color}22;color:${inv.color}">${inv.client.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+          <div><div class="client-name">${inv.client}</div><div class="client-org">${inv.org}</div></div>
+        </div>
+      </td>
+      <td><span class="quote-id" style="color:var(--accent)">${inv.quoteRef}</span></td>
+      <td style="font-family:var(--mono);font-size:12.5px">${inv.amount}</td>
+      <td style="font-family:var(--mono);font-size:12.5px;color:var(--text3)">${inv.gst}</td>
+      <td><span class="amount">${inv.total}</span></td>
+      <td><span class="badge ${invStatusBadge[inv.status]}">${invStatusLabel[inv.status]}</span></td>
+      <td style="color:${inv.status==='overdue'?'var(--danger)':'var(--text3)'};font-size:12.5px;font-weight:${inv.status==='overdue'?'500':'400'}">${inv.due}</td>
+      <td>
+        <div class="row-actions">
+          <div class="icon-btn tooltip-wrap" title="Record payment" onclick="recordPayment('${inv.id}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            <span class="tooltip">Record payment</span>
+          </div>
+          <div class="icon-btn tooltip-wrap">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span class="tooltip">Preview PDF</span>
+          </div>
+          <div class="icon-btn tooltip-wrap">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+            <span class="tooltip">Send reminder</span>
+          </div>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filterInvTable(q) {
+  renderInvTable(invoices.filter(i => i.client.toLowerCase().includes(q.toLowerCase()) || i.id.toLowerCase().includes(q.toLowerCase())));
+}
+
+function filterInvTab(el, status) {
+  document.querySelectorAll('#section-invoices .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderInvTable(status === 'all' ? invoices : invoices.filter(i => i.status === status));
+}
+
+function recordPayment(id) {
+  const inv = invoices.find(i => i.id === id);
+  if (!inv) return;
+  if (confirm(`Mark ${id} (${inv.total}) as paid?`)) {
+    inv.status = 'paid';
+    renderInvTable(invoices);
+  }
+}
+
+// ── New invoice panel ──────────────────────────────────────────────────────────
+let invRowCount = 1;
+
+function addInvItem() {
+  const idx = invRowCount++;
+  const row = document.createElement('tr');
+  row.className = 'inv-item-row';
+  row.style.borderTop = '1px solid var(--border)';
+  row.innerHTML = `
+    <td style="padding:8px 12px"><input class="form-input" style="padding:5px 8px;font-size:12.5px" placeholder="Module / service description" oninput="recalcInv()"/></td>
+    <td style="padding:8px 12px;text-align:right"><input class="form-input" style="padding:5px 8px;font-size:12.5px;width:52px;text-align:center" type="number" value="1" oninput="recalcInv()"/></td>
+    <td style="padding:8px 12px;text-align:right"><input class="form-input" style="padding:5px 8px;font-size:12.5px;width:90px;text-align:right;font-family:var(--mono)" type="number" placeholder="0" oninput="recalcInv()"/></td>
+    <td style="padding:8px 12px;text-align:right;font-family:var(--mono);font-size:12.5px;color:var(--accent2)" id="inv-row-amt-${idx}">₹0</td>
+    <td style="padding:8px 12px;text-align:center"><button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1" onclick="removeInvRow(this)">×</button></td>`;
+  document.getElementById('inv-items-body').appendChild(row);
+}
+
+function removeInvRow(btn) {
+  const row = btn.closest('tr');
+  if (document.querySelectorAll('.inv-item-row').length > 1) {
+    row.remove();
+    recalcInv();
+  }
+}
+
+function recalcInv() {
+  let subtotal = 0;
+  document.querySelectorAll('.inv-item-row').forEach((row, i) => {
+    const inputs = row.querySelectorAll('input[type="number"]');
+    const qty   = parseFloat(inputs[0]?.value) || 0;
+    const rate  = parseFloat(inputs[1]?.value) || 0;
+    const amt   = qty * rate;
+    subtotal += amt;
+    const amtEl = row.querySelector('[id^="inv-row-amt-"]');
+    if (amtEl) amtEl.textContent = '₹' + Math.round(amt).toLocaleString('en-IN');
+  });
+  const disc    = parseFloat(document.getElementById('inv-discount')?.value) || 0;
+  const gstRate = parseFloat(document.getElementById('inv-gst-rate')?.value) || 18;
+  const afterDisc = Math.max(0, subtotal - disc);
+  const gst     = Math.round(afterDisc * gstRate / 100);
+  const total   = afterDisc + gst;
+  const fmt = n => '₹' + Math.round(n).toLocaleString('en-IN');
+  const s = id => document.getElementById(id);
+  if (s('inv-subtotal'))     s('inv-subtotal').textContent     = fmt(subtotal);
+  if (s('inv-disc-display')) s('inv-disc-display').textContent = '− ' + fmt(disc);
+  if (s('inv-gst-label'))    s('inv-gst-label').textContent    = `GST (${gstRate}%)`;
+  if (s('inv-gst-display'))  s('inv-gst-display').textContent  = fmt(gst);
+  if (s('inv-total'))        s('inv-total').textContent        = fmt(total);
+}
+
+function loadFromQuote(ref) {
+  if (!ref) return;
+  const q = quotes.find(x => x.id === ref);
+  if (!q) return;
+  const nameEl = document.getElementById('inv-client');
+  if (nameEl) nameEl.value = q.client;
+  const emailEl = document.getElementById('inv-email');
+  if (emailEl) emailEl.value = q.client.toLowerCase().replace(/\s+/g,'.') + '@business.in';
+  document.getElementById('inv-items-body').innerHTML = `
+    <tr class="inv-item-row" style="border-top:1px solid var(--border)">
+      <td style="padding:8px 12px"><input class="form-input" style="padding:5px 8px;font-size:12.5px" value="${q.product} — Licence" oninput="recalcInv()"/></td>
+      <td style="padding:8px 12px;text-align:right"><input class="form-input" style="padding:5px 8px;font-size:12.5px;width:52px;text-align:center" type="number" value="1" oninput="recalcInv()"/></td>
+      <td style="padding:8px 12px;text-align:right"><input class="form-input" style="padding:5px 8px;font-size:12.5px;width:90px;text-align:right;font-family:var(--mono)" type="number" value="${parseInt(q.amount.replace(/[^0-9]/g,''))}" oninput="recalcInv()"/></td>
+      <td style="padding:8px 12px;text-align:right;font-family:var(--mono);font-size:12.5px;color:var(--accent2)" id="inv-row-amt-0">${q.amount}</td>
+      <td style="padding:8px 12px;text-align:center"><button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px" onclick="removeInvRow(this)">×</button></td>
+    </tr>`;
+  invRowCount = 1;
+  recalcInv();
+}
+
+// ── Subscription data ──────────────────────────────────────────────────────────
+const subscriptions = [
+  { id:'SUB-001', client:'Apollo Pharmacy',    org:'Apollo Health',      suite:'Pharmacy Suite', plan:'growth',     modules:['Outlet Mgmt','POS & Billing','Inventory','Online Ordering','HRMS'],         cycle:'Annual',    mrr:'₹9,667',  start:'Jan 1, 2024',  renewal:'Dec 31, 2025', status:'active',   color:'#3b82f6' },
+  { id:'SUB-002', client:'Green Cross Clinic', org:'GCC Healthcare',     suite:'Clinic Suite',   plan:'starter',    modules:['EMR','Appointments','Billing'],                                               cycle:'Monthly',   mrr:'₹3,500',  start:'Feb 15, 2024', renewal:'Apr 25, 2025', status:'expiring', color:'#10b981' },
+  { id:'SUB-003', client:'MedPlus Pharma',     org:'MedPlus Pvt Ltd',    suite:'Pharmacy Suite', plan:'growth',     modules:['POS & Billing','Inventory','Online Ordering','Delivery App'],                 cycle:'Annual',    mrr:'₹7,250',  start:'Mar 1, 2024',  renewal:'Feb 28, 2026', status:'active',   color:'#8b5cf6' },
+  { id:'SUB-004', client:'City Hospital',      org:'City Health Group',  suite:'Clinic Suite',   plan:'enterprise', modules:['EMR','Appointments','Billing','Digital Prescription','Lab Integration'],     cycle:'Annual',    mrr:'₹14,500', start:'Apr 10, 2024', renewal:'Apr 9, 2026',  status:'active',   color:'#f59e0b' },
+  { id:'SUB-005', client:'Wellness First',     org:'WF Pharma',          suite:'Pharmacy Suite', plan:'starter',    modules:['POS & Billing','Inventory'],                                                  cycle:'Monthly',   mrr:'₹2,800',  start:'Sep 1, 2023',  renewal:'Apr 1, 2025',  status:'expiring', color:'#6b7280' },
+  { id:'SUB-006', client:'Lifeline Hospital',  org:'Lifeline Trust',     suite:'Clinic Suite',   plan:'growth',     modules:['EMR','Appointments','Billing','Teleconsultation'],                           cycle:'Quarterly', mrr:'₹6,100',  start:'Feb 1, 2024',  renewal:'Apr 30, 2025', status:'expiring', color:'#10b981' },
+  { id:'SUB-007', client:'Quick Mart',         org:'Quick Retail Chain', suite:'Retail Suite',   plan:'growth',     modules:['POS & Billing','Inventory','Online Ordering'],                                cycle:'Annual',    mrr:'₹5,400',  start:'Jan 15, 2025', renewal:'Jan 14, 2026', status:'active',   color:'#f59e0b' },
+  { id:'SUB-008', client:'Apollo Pharmacy',    org:'Apollo Health',      suite:'Pharmacy Suite', plan:'growth',     modules:['Analytics Dashboard','Loyalty Program'],                                      cycle:'Monthly',   mrr:'₹1,500',  start:'Mar 1, 2024',  renewal:'Apr 1, 2025',  status:'expiring', color:'#3b82f6' },
+  { id:'SUB-009', client:'MedPlus Pharma',     org:'MedPlus Pvt Ltd',    suite:'Pharmacy Suite', plan:'starter',    modules:['Vendor Management','Modern Website'],                                         cycle:'Annual',    mrr:'₹1,800',  start:'Jun 1, 2023',  renewal:'Feb 1, 2025',  status:'churned',  color:'#8b5cf6' },
+  { id:'SUB-010', client:'City Hospital',      org:'City Health Group',  suite:'Clinic Suite',   plan:'growth',     modules:['In-house Pharmacy','Billing'],                                                cycle:'Annual',    mrr:'₹3,200',  start:'Jan 1, 2023',  renewal:'Dec 31, 2023', status:'churned',  color:'#f59e0b' },
+];
+
+const subStatusBadge = { active:'badge-accepted', expiring:'badge-expiring', churned:'badge-churned' };
+const subStatusLabel = { active:'Active', expiring:'Expiring', churned:'Churned' };
+
+function renderSubTable(data) {
+  const tbody = document.getElementById('subs-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty"><div class="empty-icon">🔁</div><div class="empty-text">No subscriptions found</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(s => `
+    <tr>
+      <td>
+        <div class="client-cell">
+          <div class="client-avatar" style="background:${s.color}22;color:${s.color}">${s.client.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+          <div><div class="client-name">${s.client}</div><div class="client-org">${s.org}</div></div>
+        </div>
+      </td>
+      <td>
+        <div style="font-size:13px;font-weight:500;margin-bottom:4px">${s.suite}</div>
+        <span class="plan-${s.plan}">${s.plan.charAt(0).toUpperCase()+s.plan.slice(1)}</span>
+      </td>
+      <td>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;max-width:220px">
+          ${s.modules.map(m => `<span style="font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text2)">${m}</span>`).join('')}
+        </div>
+      </td>
+      <td style="color:var(--text2);font-size:12.5px">${s.cycle}</td>
+      <td><span class="amount" style="color:var(--accent2)">${s.mrr}<span style="font-size:10px;color:var(--text3)">/mo</span></span></td>
+      <td style="color:var(--text3);font-size:12.5px">${s.start}</td>
+      <td style="color:${s.status==='expiring'?'var(--warn)':s.status==='churned'?'var(--danger)':'var(--text3)'};font-size:12.5px;font-weight:${s.status==='expiring'?'500':'400'}">${s.renewal}</td>
+      <td><span class="badge ${subStatusBadge[s.status]}">${subStatusLabel[s.status]}</span></td>
+      <td>
+        <div class="row-actions">
+          <div class="icon-btn tooltip-wrap" onclick="openRenewalQuote('${s.id}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span class="tooltip">Renew</span>
+          </div>
+          <div class="icon-btn tooltip-wrap" onclick="manageModules('${s.id}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span class="tooltip">Manage modules</span>
+          </div>
+          <div class="icon-btn tooltip-wrap">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="tooltip">View invoice</span>
+          </div>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filterSubTable(q) {
+  renderSubTable(subscriptions.filter(s =>
+    s.client.toLowerCase().includes(q.toLowerCase()) ||
+    s.modules.some(m => m.toLowerCase().includes(q.toLowerCase()))
+  ));
+}
+
+function filterSubTab(el, status) {
+  document.querySelectorAll('#section-subscriptions .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderSubTable(status === 'all' ? subscriptions : subscriptions.filter(s => s.status === status));
+}
+
+function openRenewalQuote(id) {
+  const s = subscriptions.find(x => x.id === id);
+  if (!s) return;
+  // Switch to quotations and open new quote panel pre-filled
+  switchSection('quotations', document.querySelector('[onclick*="quotations"]'));
+  setTimeout(() => {
+    openPanel('new');
+    const nameEl = document.getElementById('inv-client') || document.querySelector('#panel-new .form-input');
+    if (nameEl) nameEl.value = s.client;
+  }, 100);
+}
+
+function manageModules(id) {
+  openPanel('newsub');
+  const s = subscriptions.find(x => x.id === id);
+  if (!s) return;
+  const clientSel = document.getElementById('sub-client');
+  if (clientSel) clientSel.value = s.client;
+  const suiteSel = document.getElementById('sub-suite');
+  if (suiteSel) {
+    const key = s.suite.toLowerCase().includes('pharmacy') ? 'pharmacy' : s.suite.toLowerCase().includes('clinic') ? 'clinic' : 'retail';
+    suiteSel.value = key;
+  }
+  subUpdateModules();
+}
+
+// ── Subscription panel JS ──────────────────────────────────────────────────────
+let subActiveModules = new Set();
+
+function subUpdateModules() {
+  const suiteKey = document.getElementById('sub-suite')?.value || 'pharmacy';
+  const suite = SUITE_CATALOGUE[suiteKey];
+  if (!suite) return;
+  const all = [...suite.core, ...suite.addons];
+  subActiveModules = new Set(suite.core.map(m => m.id)); // core on by default
+  const list = document.getElementById('sub-modules-list');
+  if (!list) return;
+  list.innerHTML = all.map(m => {
+    const isOn = subActiveModules.has(m.id);
+    const isCore = suite.core.some(c => c.id === m.id);
+    return `<div class="sub-mod-row${isOn?' on':''}" id="subrow-${m.id}">
+      <div>
+        <div style="font-size:13px;font-weight:500;color:var(--text)">${m.name}</div>
+        <div style="font-size:11.5px;color:var(--text3)">${m.desc} · ${fmt(m.price)}/yr</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${isCore ? '<span style="font-size:10px;color:var(--accent);font-family:var(--mono)">Core</span>' : ''}
+        <div class="sub-mod-toggle${isOn?' on':''}" onclick="toggleSubMod('${m.id}')"></div>
+      </div>
+    </div>`;
+  }).join('');
+  subRecalc();
+}
+
+function toggleSubMod(id) {
+  const row = document.getElementById('subrow-' + id);
+  const toggle = row?.querySelector('.sub-mod-toggle');
+  if (subActiveModules.has(id)) {
+    subActiveModules.delete(id);
+    row?.classList.remove('on');
+    toggle?.classList.remove('on');
+  } else {
+    subActiveModules.add(id);
+    row?.classList.add('on');
+    toggle?.classList.add('on');
+  }
+  subRecalc();
+}
+
+function subRecalc() {
+  const suiteKey = document.getElementById('sub-suite')?.value || 'pharmacy';
+  const suite = SUITE_CATALOGUE[suiteKey];
+  if (!suite) return;
+  const all = [...suite.core, ...suite.addons];
+  const cycleEl = document.getElementById('sub-cycle');
+  const cycle = cycleEl?.value || 'annual';
+  const cycleMultiplier = cycle === 'monthly' ? 1 : cycle === 'quarterly' ? 3 : 12;
+  const cycleLabel = cycle === 'monthly' ? 'Monthly' : cycle === 'quarterly' ? 'Quarterly' : 'Annual';
+
+  let totalAnnual = 0;
+  subActiveModules.forEach(id => {
+    const m = all.find(x => x.id === id);
+    if (m) totalAnnual += m.price;
+  });
+
+  const mrr = Math.round(totalAnnual / 12);
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('sub-mod-count', subActiveModules.size + ' modules');
+  set('sub-base', fmt(totalAnnual) + '/yr');
+  set('sub-cycle-label', cycleLabel);
+  set('sub-mrr', fmt(mrr) + '/mo');
+}
+
+// ── Accounts data ──────────────────────────────────────────────────────────────
+const accountsData = {
+  'Apollo Pharmacy': {
+    org:'Apollo Health', outstanding:'₹26,000', paid:'₹1,16,400', credit:'₹0',
+    color:'#3b82f6',
+    ledger:[
+      { date:'Jan 5 2024',  desc:'Invoice INV-2025-023 raised',          cr:0,      dr:34500, bal:34500  },
+      { date:'Jan 20 2024', desc:'Payment received — NEFT',              cr:34500,  dr:0,     bal:0      },
+      { date:'Mar 1 2024',  desc:'Invoice INV-2025-018 raised',          cr:0,      dr:55000, bal:55000  },
+      { date:'Mar 22 2024', desc:'Payment received — UPI',               cr:55000,  dr:0,     bal:0      },
+      { date:'Jan 1 2025',  desc:'Invoice INV-2025-024 raised',          cr:0,      dr:58200, bal:58200  },
+      { date:'Feb 15 2025', desc:'Partial payment received',             cr:32200,  dr:0,     bal:26000  },
+      { date:'Mar 10 2025', desc:'Credit note CN-001 applied',           cr:2000,   dr:0,     bal:24000  },
+    ]
+  },
+  'Green Cross Clinic': {
+    org:'GCC Healthcare', outstanding:'₹0', paid:'₹69,000', credit:'₹0',
+    color:'#10b981',
+    ledger:[
+      { date:'Feb 15 2024', desc:'Invoice INV-2024-012 raised',          cr:0,      dr:34500, bal:34500 },
+      { date:'Mar 5 2024',  desc:'Payment received — Bank transfer',     cr:34500,  dr:0,     bal:0     },
+      { date:'Oct 10 2024', desc:'Invoice INV-2024-019 raised',          cr:0,      dr:34500, bal:34500 },
+      { date:'Oct 28 2024', desc:'Payment received — NEFT',              cr:34500,  dr:0,     bal:0     },
+    ]
+  },
+  'MedPlus Pharma': {
+    org:'MedPlus Pvt Ltd', outstanding:'₹45,000', paid:'₹51,920', credit:'₹0',
+    color:'#8b5cf6',
+    ledger:[
+      { date:'Mar 1 2024',  desc:'Invoice INV-2025-022 raised',          cr:0,      dr:51920, bal:51920 },
+      { date:'Mar 18 2024', desc:'Payment received — RTGS',              cr:51920,  dr:0,     bal:0     },
+      { date:'Dec 1 2024',  desc:'Invoice INV-2025-015 raised',          cr:0,      dr:45000, bal:45000 },
+    ]
+  },
+  'Reliance Retail': {
+    org:'Reliance Industries', outstanding:'₹82,000', paid:'₹0', credit:'₹0',
+    color:'#ef4444',
+    ledger:[
+      { date:'Feb 1 2025',  desc:'Invoice INV-2025-020 raised',          cr:0,      dr:82000, bal:82000 },
+      { date:'Mar 10 2025', desc:'Due date passed — overdue',            cr:0,      dr:0,     bal:82000 },
+    ]
+  },
+  'Lifeline Hospital': {
+    org:'Lifeline Trust', outstanding:'₹0', paid:'₹55,000', credit:'₹0',
+    color:'#10b981',
+    ledger:[
+      { date:'Mar 1 2024',  desc:'Invoice INV-2025-018 raised',          cr:0,      dr:55000, bal:55000 },
+      { date:'Mar 25 2024', desc:'Payment received — UPI',               cr:55000,  dr:0,     bal:0     },
+    ]
+  },
+  'Quick Mart': {
+    org:'Quick Retail Chain', outstanding:'₹38,750', paid:'₹0', credit:'₹0',
+    color:'#f59e0b',
+    ledger:[
+      { date:'Mar 5 2025',  desc:'Invoice INV-2025-017 raised',          cr:0,      dr:38750, bal:38750 },
+    ]
+  },
+};
+
+let selectedAcctClient = null;
+
+function fmt2(n) { return '₹' + Math.abs(n).toLocaleString('en-IN'); }
+
+function renderAcctClientList(filter) {
+  const list = document.getElementById('acct-client-list');
+  if (!list) return;
+  const entries = Object.entries(accountsData).filter(([name]) =>
+    !filter || name.toLowerCase().includes(filter.toLowerCase())
+  );
+  list.innerHTML = entries.map(([name, data]) => {
+    const outstanding = parseInt(data.outstanding.replace(/[^0-9]/g, ''));
+    const isSelected = name === selectedAcctClient;
+    return `<div class="acct-card" onclick="selectAcctClient('${name}')" style="cursor:pointer;border-color:${isSelected ? 'var(--accent)' : 'var(--border)'};background:${isSelected ? 'var(--accent-dim)' : 'var(--surface)'};transition:all 0.15s">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;border-radius:6px;background:${data.color}22;color:${data.color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0">${name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+          <div>
+            <div style="font-size:13px;font-weight:500">${name}</div>
+            <div style="font-size:11px;color:var(--text3)">${data.org}</div>
+          </div>
+        </div>
+        ${outstanding > 0
+          ? `<span style="font-size:11px;font-family:var(--mono);color:var(--danger);background:var(--danger-dim);padding:2px 7px;border-radius:4px">${data.outstanding}</span>`
+          : `<span style="font-size:11px;font-family:var(--mono);color:var(--accent2)">Cleared</span>`}
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)">
+        <span>Paid: <span style="color:var(--text2)">${data.paid}</span></span>
+        <span>${data.ledger.length} entries</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectAcctClient(name) {
+  selectedAcctClient = name;
+  renderAcctClientList();
+  const data = accountsData[name];
+  if (!data) return;
+
+  // Update header
+  document.getElementById('acct-detail-name').textContent = name;
+  document.getElementById('acct-detail-meta').textContent = data.org + ' · ' + data.ledger.length + ' transactions';
+
+  const outstanding = parseInt(data.outstanding.replace(/[^0-9]/g, '')) || 0;
+  document.getElementById('acct-detail-balance').innerHTML = `
+    <div style="font-size:11px;color:var(--text3);margin-bottom:2px">Outstanding balance</div>
+    <div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${outstanding>0?'var(--danger)':'var(--accent2)'}">
+      ${outstanding > 0 ? data.outstanding : '₹0'}
+    </div>`;
+
+  // Summary strip
+  document.getElementById('acct-summary-row').innerHTML = [
+    { label:'Total invoiced',  val: fmt2(data.ledger.reduce((s,r)=>s+r.dr,0)), color:'var(--text)' },
+    { label:'Total collected', val: fmt2(data.ledger.reduce((s,r)=>s+r.cr,0)), color:'var(--accent2)' },
+    { label:'Outstanding',     val: data.outstanding, color: outstanding>0?'var(--danger)':'var(--accent2)' },
+  ].map(s => `
+    <div style="background:var(--surface2);padding:12px 16px;text-align:center">
+      <div style="font-size:10.5px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">${s.label}</div>
+      <div style="font-size:16px;font-weight:600;font-family:var(--mono);color:${s.color}">${s.val}</div>
+    </div>`).join('');
+
+  // Ledger rows
+  let runningBal = 0;
+  document.getElementById('acct-ledger-rows').innerHTML = data.ledger.map(row => {
+    if (row.dr) runningBal += row.dr;
+    if (row.cr) runningBal -= row.cr;
+    return `<div class="ledger-row">
+      <div class="ledger-cell" style="color:var(--text3);font-family:var(--mono);font-size:12px">${row.date}</div>
+      <div class="ledger-cell">${row.desc}</div>
+      <div class="ledger-cell" style="text-align:right" class="ledger-cr">${row.cr ? '<span class="ledger-cr">+ ' + fmt2(row.cr) + '</span>' : '—'}</div>
+      <div class="ledger-cell" style="text-align:right">${row.dr ? '<span class="ledger-dr">− ' + fmt2(row.dr) + '</span>' : '—'}</div>
+      <div class="ledger-cell ledger-bal" style="text-align:right;color:${runningBal>0?'var(--danger)':'var(--accent2)'}">
+        ${fmt2(Math.abs(runningBal))}${runningBal>0?' DR':' CR'}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Show footer
+  const footer = document.getElementById('acct-footer');
+  if (footer) footer.style.display = 'flex';
+}
+
+function filterAcctClients(q) {
+  renderAcctClientList(q);
+}
+
+// ── Record payment JS ──────────────────────────────────────────────────────────
+function rpUpdateType() {
+  const banner = document.getElementById('rp-type-banner');
+  if (!banner) return;
+  const inv = document.getElementById('rp-invoice')?.value || '';
+  const amt = parseFloat(document.getElementById('rp-amount')?.value) || 0;
+  if (!inv || !amt) { banner.style.display = 'none'; return; }
+  const invoiceAmt = parseInt(inv.match(/₹([\d,]+)/)?.[1]?.replace(/,/g,'') || '0');
+  if (amt >= invoiceAmt) {
+    banner.style.cssText = 'display:block;padding:10px 14px;border-radius:var(--radius-sm);background:var(--accent2-dim);border:1px solid rgba(16,185,129,0.25);color:var(--accent2);font-size:12.5px;font-weight:500';
+    banner.textContent = '✓ Full payment — invoice will be marked as Paid';
+  } else {
+    banner.style.cssText = 'display:block;padding:10px 14px;border-radius:var(--radius-sm);background:var(--warn-dim);border:1px solid rgba(245,158,11,0.25);color:var(--warn);font-size:12.5px;font-weight:500';
+    banner.textContent = '⚠ Partial payment — invoice will be marked as Partial';
+  }
+}
+
+function savePayment() {
+  const client  = document.getElementById('rp-client')?.value;
+  const amount  = document.getElementById('rp-amount')?.value;
+  const ref     = document.getElementById('rp-ref')?.value;
+  if (!client || !amount) { alert('Please fill in client and amount.'); return; }
+  const date = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  if (accountsData[client]) {
+    const bal = accountsData[client].ledger.slice(-1)[0]?.bal || 0;
+    accountsData[client].ledger.push({
+      date, desc: `Payment received${ref?' — '+ref:''}`, cr: parseInt(amount), dr:0, bal: Math.max(0, bal - parseInt(amount))
+    });
+  }
+  closePanel('recordpayment', null, true);
+  if (selectedAcctClient === client) selectAcctClient(client);
+  renderAcctClientList();
+}
+
+// ── Clients data ───────────────────────────────────────────────────────────────
+const clients = [
+  { id:'CL-001', name:'Ravi Kumar',      role:'Procurement Head', org:'Apollo Pharmacy',   industry:'Pharmacy', city:'Chennai',    email:'ravi@apollo.in',        phone:'+91 98765 11111', status:'active',   product:'Pharmacy Suite', totalBilled:'₹1,16,400', quotes:3, since:'Jan 2024', color:'#3b82f6', gst:'33AABCA0000A1Z5', notes:'Key account. Interested in delivery module add-on.' },
+  { id:'CL-002', name:'Dr. Priya Nair',  role:'Medical Director',  org:'Green Cross Clinic',industry:'Clinic',   city:'Kochi',     email:'priya@greencross.in',   phone:'+91 98765 22222', status:'active',   product:'Clinic Suite',   totalBilled:'₹69,000',   quotes:2, since:'Feb 2024', color:'#10b981', gst:'32AABCB0000A1Z5', notes:'Expanding to a second branch in Q3.' },
+  { id:'CL-003', name:'Suresh Mehta',    role:'Operations Manager',org:'MedPlus Pharma',    industry:'Pharmacy', city:'Mumbai',    email:'suresh@medplus.in',     phone:'+91 98765 33333', status:'active',   product:'Pharmacy Suite', totalBilled:'₹51,920',   quotes:1, since:'Mar 2024', color:'#8b5cf6', gst:'27AABCC0000A1Z5', notes:'Fast decision cycle. Responded well to demo.' },
+  { id:'CL-004', name:'Ananya Singh',    role:'CEO',               org:'City Hospital',     industry:'Clinic',   city:'Delhi',     email:'ananya@cityhospital.in',phone:'+91 98765 44444', status:'prospect', product:'Clinic Suite',   totalBilled:'—',         quotes:1, since:'Mar 2025', color:'#f59e0b', gst:'—',             notes:'In evaluation phase. Quote pending approval.' },
+  { id:'CL-005', name:'Kartik Rao',      role:'Retail Head',       org:'Reliance Retail',   industry:'Retail',   city:'Bangalore', email:'kartik@reliance.in',    phone:'+91 98765 55555', status:'prospect', product:'Retail Suite',   totalBilled:'—',         quotes:1, since:'Mar 2025', color:'#ef4444', gst:'29AABCE0000A1Z5', notes:'Large deal in review by finance team.' },
+  { id:'CL-006', name:'Meena Iyer',      role:'Director',          org:'Wellness First',    industry:'Pharmacy', city:'Hyderabad', email:'meena@wellnessfirst.in',phone:'+91 98765 66666', status:'churned',  product:'Pharmacy Suite', totalBilled:'₹41,600',   quotes:2, since:'Sep 2023', color:'#6b7280', gst:'36AABCF0000A1Z5', notes:'Contract ended. May re-engage for retail suite.' },
+  { id:'CL-007', name:'Dr. Arun Thomas', role:'Hospital Admin',    org:'Lifeline Hospital', industry:'Clinic',   city:'Trivandrum',email:'arun@lifeline.in',      phone:'+91 98765 77777', status:'active',   product:'Clinic Suite',   totalBilled:'₹55,000',   quotes:1, since:'Feb 2024', color:'#10b981', gst:'32AABCG0000A1Z5', notes:'Happy customer. Referred two new prospects.' },
+  { id:'CL-008', name:'Vikram Shetty',   role:'Owner',             org:'Quick Mart',        industry:'Retail',   city:'Mangalore', email:'vikram@quickmart.in',   phone:'+91 98765 88888', status:'active',   product:'Retail Suite',   totalBilled:'₹38,750',   quotes:1, since:'Jan 2025', color:'#f59e0b', gst:'29AABCH0000A1Z5', notes:'Wants online ordering integration urgently.' },
+];
+const statusLabelsC = { active:'Active', prospect:'Prospect', churned:'Churned' };
+let filteredClients = [...clients];
+
+function clientBadgeClass(s) { return s === 'active' ? 'badge-accepted' : s === 'prospect' ? 'badge-review' : 'badge-draft'; }
+
+function renderClientsGrid(data) {
+  document.getElementById('clients-grid').innerHTML = data.map(c => `
+    <div class="client-card" onclick="openClientDetail('${c.id}')">
+      <div class="client-card-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="client-card-avatar" style="background:${c.color}22;color:${c.color}">${c.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+          <div><div class="client-card-name">${c.name}</div><div class="client-card-role">${c.role}</div></div>
+        </div>
+        <span class="badge ${clientBadgeClass(c.status)}">${statusLabelsC[c.status]}</span>
+      </div>
+      <div style="font-size:13px;font-weight:500;margin-bottom:2px">${c.org}</div>
+      <div style="font-size:11.5px;color:var(--text3);margin-bottom:12px">${c.industry} · ${c.city}</div>
+      <hr class="client-card-divider"/>
+      <div class="client-card-meta">
+        <div class="client-card-meta-item"><div class="client-card-meta-label">Product</div><div class="client-card-meta-val" style="font-size:12px">${c.product}</div></div>
+        <div class="client-card-meta-item"><div class="client-card-meta-label">Total billed</div><div class="client-card-meta-val" style="font-family:var(--mono);color:var(--accent2)">${c.totalBilled}</div></div>
+        <div class="client-card-meta-item"><div class="client-card-meta-label">Quotes</div><div class="client-card-meta-val">${c.quotes}</div></div>
+        <div class="client-card-meta-item"><div class="client-card-meta-label">Since</div><div class="client-card-meta-val">${c.since}</div></div>
+      </div>
+      <div class="client-card-footer">
+        <div style="font-size:11.5px;color:var(--text3)">${c.email}</div>
+        <div class="icon-btn" onclick="event.stopPropagation();openPanel('new')" title="New quote">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderClientsList(data) {
+  document.getElementById('clients-tbody').innerHTML = data.map(c => `
+    <tr onclick="openClientDetail('${c.id}')" style="cursor:pointer">
+      <td>
+        <div class="client-cell">
+          <div class="client-avatar" style="background:${c.color}22;color:${c.color}">${c.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+          <div><div class="client-name">${c.name}</div><div class="client-org">${c.org} · ${c.city}</div></div>
+        </div>
+      </td>
+      <td style="color:var(--text2)">${c.product}</td>
+      <td><span class="badge ${clientBadgeClass(c.status)}">${statusLabelsC[c.status]}</span></td>
+      <td><span class="amount" style="color:var(--accent2)">${c.totalBilled}</span></td>
+      <td style="color:var(--text2)">${c.quotes}</td>
+      <td style="color:var(--text3);font-size:12.5px">${c.since}</td>
+      <td>
+        <div class="row-actions">
+          <div class="icon-btn tooltip-wrap" onclick="event.stopPropagation();openClientDetail('${c.id}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span class="tooltip">View</span>
+          </div>
+          <div class="icon-btn tooltip-wrap" onclick="event.stopPropagation();openPanel('new')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="tooltip">New quote</span>
+          </div>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function renderClients(data) { renderClientsGrid(data); renderClientsList(data); }
+
+function filterClients(q) {
+  filteredClients = clients.filter(c => c.name.toLowerCase().includes(q.toLowerCase()) || c.org.toLowerCase().includes(q.toLowerCase()) || c.city.toLowerCase().includes(q.toLowerCase()));
+  renderClients(filteredClients);
+}
+function filterClientsByProduct(val) { filteredClients = val ? clients.filter(c => c.industry.includes(val)) : [...clients]; renderClients(filteredClients); }
+function filterClientsByStatus(val)  { filteredClients = val ? clients.filter(c => c.status === val) : [...clients]; renderClients(filteredClients); }
+
+function setClientView(v) {
+  document.getElementById('clients-grid').style.display = v === 'grid' ? 'grid' : 'none';
+  document.getElementById('clients-list').style.display = v === 'list' ? ''     : 'none';
+  const gb = document.getElementById('view-grid-btn'), lb = document.getElementById('view-list-btn');
+  gb.style.background = v==='grid'?'var(--accent-dim)':''; gb.style.color=v==='grid'?'var(--accent)':'';
+  lb.style.background = v==='list'?'var(--accent-dim)':''; lb.style.color=v==='list'?'var(--accent)':'';
+}
+
+function openClientDetail(id) {
+  const c = clients.find(x => x.id === id); if (!c) return;
+  const av = document.getElementById('cd-avatar');
+  av.style.background = c.color+'22'; av.style.color = c.color;
+  av.textContent = c.name.split(' ').map(w=>w[0]).join('').slice(0,2);
+  document.getElementById('cd-name').textContent = c.name + ' · ' + c.role;
+  document.getElementById('cd-org').textContent  = c.org  + ' · ' + c.city;
+  document.getElementById('cd-info-grid').innerHTML = [
+    {label:'Email',        val:c.email},
+    {label:'Phone',        val:c.phone},
+    {label:'Industry',     val:c.industry},
+    {label:'Product',      val:c.product},
+    {label:'GST Number',   val:`<span style="font-family:var(--mono);font-size:12px">${c.gst}</span>`},
+    {label:'Client since', val:c.since},
+    {label:'Status',       val:`<span class="badge ${clientBadgeClass(c.status)}">${statusLabelsC[c.status]}</span>`},
+    {label:'Notes',        val:c.notes},
+  ].map(i=>`<div class="info-row"><div class="info-row-label">${i.label}</div><div class="info-row-val">${i.val}</div></div>`).join('');
+  document.getElementById('cd-stats').innerHTML = [
+    {label:'Total billed',val:c.totalBilled,color:'var(--accent2)'},
+    {label:'Total quotes', val:c.quotes,     color:'var(--text)'},
+    {label:'Member since', val:c.since,      color:'var(--text)'},
+  ].map(s=>`<div class="stat-card" style="padding:12px 14px"><div class="stat-label">${s.label}</div><div class="stat-val" style="font-size:20px;color:${s.color}">${s.val}</div></div>`).join('');
+  const cq = quotes.filter(q => q.client === c.name || q.org === c.org);
+  document.getElementById('cd-quotes-tbody').innerHTML = cq.length
+    ? cq.map(q=>`<tr><td><span class="quote-id">${q.id}</span></td><td style="color:var(--text2)">${q.product}</td><td><span class="amount">${q.amount}</span></td><td><span class="badge ${statusBadge[q.status]}">${statusLabel[q.status]}</span></td><td style="color:var(--text3);font-size:12.5px">${q.expiry}</td></tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:20px;font-size:13px">No quotes yet for this client</td></tr>`;
+  openPanel('clientdetail');
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+renderTable(quotes);
+renderClients(clients);
+</script>
+</body>
+</html>
