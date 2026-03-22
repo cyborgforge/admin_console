@@ -18,42 +18,42 @@ import {
 } from "@/components/ui/sheet"
 
 type Module = {
+  id: string
   name: string
+  desc: string
   price: number
+  isCore: boolean
   enabled: boolean
 }
 
-const pharmacyModules: Module[] = [
-  { name: "Outlet Management", price: 2000, enabled: true },
-  { name: "POS & Billing", price: 3000, enabled: true },
-  { name: "Inventory Management", price: 2500, enabled: true },
-  { name: "Online Ordering", price: 2000, enabled: false },
-  { name: "Delivery App", price: 1500, enabled: false },
-  { name: "HRMS", price: 1800, enabled: false },
-  { name: "Analytics Dashboard", price: 1200, enabled: false },
-]
-
-const clinicModules: Module[] = [
-  { name: "EMR", price: 3500, enabled: true },
-  { name: "Appointments", price: 1500, enabled: true },
-  { name: "Billing", price: 2000, enabled: true },
-  { name: "Digital Prescription", price: 1800, enabled: false },
-  { name: "Lab Integration", price: 2500, enabled: false },
-  { name: "Teleconsultation", price: 2000, enabled: false },
-]
-
-const retailModules: Module[] = [
-  { name: "POS & Billing", price: 2500, enabled: true },
-  { name: "Inventory Management", price: 2000, enabled: true },
-  { name: "Online Ordering", price: 1800, enabled: false },
-  { name: "Loyalty Program", price: 1200, enabled: false },
-  { name: "Analytics", price: 1000, enabled: false },
-]
-
-const suiteModulesMap: Record<string, Module[]> = {
-  pharmacy: pharmacyModules,
-  clinic: clinicModules,
-  retail: retailModules,
+const SUITE_CATALOGUE: Record<string, Module[]> = {
+  pharmacy: [
+    { id: "outlet", name: "Outlet Management", desc: "Multi-outlet setup, branch control", price: 12000, isCore: true, enabled: true },
+    { id: "pos", name: "POS & Billing", desc: "Counter sales, receipts, barcode", price: 18000, isCore: true, enabled: true },
+    { id: "admin", name: "Admin Panel", desc: "Centralised dashboard & reports", price: 10000, isCore: true, enabled: true },
+    { id: "user", name: "User Management", desc: "Roles, permissions, staff login", price: 8000, isCore: true, enabled: true },
+    { id: "delivery", name: "Delivery App", desc: "Driver app, route & status tracking", price: 9000, isCore: true, enabled: true },
+    { id: "inventory", name: "Inventory Management", desc: "Stock levels, expiry tracking", price: 14000, isCore: false, enabled: false },
+    { id: "online", name: "Online Ordering", desc: "Web & mobile ordering portal", price: 12000, isCore: false, enabled: false },
+    { id: "hrms", name: "HRMS", desc: "Attendance, payroll, leaves", price: 10000, isCore: false, enabled: false },
+    { id: "loyalty", name: "Loyalty Program", desc: "Points, offers, customer rewards", price: 7000, isCore: false, enabled: false },
+    { id: "analytics", name: "Analytics Dashboard", desc: "Sales insights, trend reports", price: 11000, isCore: false, enabled: false },
+  ],
+  clinic: [
+    { id: "emr", name: "EMR", desc: "Electronic medical records", price: 15000, isCore: true, enabled: true },
+    { id: "appointments", name: "Appointments", desc: "Scheduling & reminders", price: 8000, isCore: true, enabled: true },
+    { id: "billing", name: "Billing", desc: "Invoice & payments", price: 10000, isCore: true, enabled: true },
+    { id: "prescription", name: "Digital Prescription", desc: "E-prescriptions, templates", price: 6000, isCore: false, enabled: false },
+    { id: "lab", name: "Lab Integration", desc: "Results, reports sync", price: 12000, isCore: false, enabled: false },
+    { id: "teleconsult", name: "Teleconsultation", desc: "Video consults", price: 9000, isCore: false, enabled: false },
+  ],
+  retail: [
+    { id: "pos", name: "POS & Billing", desc: "Counter sales, receipts", price: 16000, isCore: true, enabled: true },
+    { id: "inventory", name: "Inventory Management", desc: "Stock tracking", price: 12000, isCore: true, enabled: true },
+    { id: "online", name: "Online Ordering", desc: "E-commerce portal", price: 14000, isCore: false, enabled: false },
+    { id: "loyalty", name: "Loyalty Program", desc: "Points & rewards", price: 8000, isCore: false, enabled: false },
+    { id: "analytics", name: "Analytics", desc: "Sales insights", price: 10000, isCore: false, enabled: false },
+  ],
 }
 
 export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?: string }) {
@@ -64,25 +64,24 @@ export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?:
   const [cycle, setCycle] = useState("annual")
   const [startDate, setStartDate] = useState("")
   const [renewalDate, setRenewalDate] = useState("")
-  const [modules, setModules] = useState<Module[]>(pharmacyModules.map((m) => ({ ...m })))
+  const [modules, setModules] = useState<Module[]>(SUITE_CATALOGUE.pharmacy.map((m) => ({ ...m })))
   const [submitting, setSubmitting] = useState(false)
 
   const updateSuiteModules = (newSuite: string) => {
     setSuite(newSuite)
-    setModules(suiteModulesMap[newSuite]?.map((m) => ({ ...m })) ?? [])
+    setModules(SUITE_CATALOGUE[newSuite]?.map((m) => ({ ...m })) ?? [])
   }
 
-  const toggleModule = (index: number) => {
+  const toggleModule = (id: string) => {
     setModules((current) =>
-      current.map((mod, i) => (i === index ? { ...mod, enabled: !mod.enabled } : mod))
+      current.map((mod) => (mod.id === id ? { ...mod, enabled: !mod.enabled } : mod))
     )
   }
 
   const computedSummary = useMemo(() => {
     const activeModules = modules.filter((m) => m.enabled)
     const basePrice = activeModules.reduce((sum, m) => sum + m.price, 0)
-    const cycleMultiplier = cycle === "monthly" ? 1 : cycle === "quarterly" ? 3 : 12
-    const mrr = basePrice
+    const mrr = Math.round(basePrice / 12)
     return {
       moduleCount: activeModules.length,
       basePrice,
@@ -98,7 +97,7 @@ export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?:
     setCycle("annual")
     setStartDate("")
     setRenewalDate("")
-    setModules(pharmacyModules.map((m) => ({ ...m })))
+    setModules(SUITE_CATALOGUE.pharmacy.map((m) => ({ ...m })))
   }
 
   async function activateSubscription() {
@@ -114,6 +113,8 @@ export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?:
     resetForm()
     setSubmitting(false)
   }
+
+  const fmt = (n: number) => "₹" + n.toLocaleString("en-IN")
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -205,18 +206,25 @@ export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?:
               <span style={{ fontSize: "11px", color: "var(--text3)" }}>Toggle to activate / deactivate</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              {modules.map((mod, index) => (
+              {modules.map((mod) => (
                 <div
-                  key={mod.name}
+                  key={mod.id}
                   className={`sub-mod-row ${mod.enabled ? "on" : ""}`}
-                  onClick={() => toggleModule(index)}
                   style={{ cursor: "pointer" }}
+                  onClick={() => toggleModule(mod.id)}
                 >
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 500 }}>{mod.name}</div>
-                    <div style={{ fontSize: "11px", color: "var(--text3)" }}>₹{mod.price.toLocaleString("en-IN")}/mo</div>
+                    <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text)" }}>{mod.name}</div>
+                    <div style={{ fontSize: "11.5px", color: "var(--text3)" }}>
+                      {mod.desc} · {fmt(mod.price)}/yr
+                    </div>
                   </div>
-                  <div className={`sub-mod-toggle ${mod.enabled ? "on" : ""}`} />
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {mod.isCore && (
+                      <span style={{ fontSize: "10px", color: "var(--accent2)", fontFamily: "var(--mono)" }}>Core</span>
+                    )}
+                    <div className={`sub-mod-toggle ${mod.enabled ? "on" : ""}`} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -255,7 +263,7 @@ export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?:
             </div>
             <div className="summary-row">
               <span>Base price</span>
-              <span style={{ fontFamily: "var(--mono)" }}>₹{computedSummary.basePrice.toLocaleString("en-IN")}</span>
+              <span style={{ fontFamily: "var(--mono)" }}>{fmt(computedSummary.basePrice)}/yr</span>
             </div>
             <div className="summary-row">
               <span>Billing cycle</span>
@@ -263,7 +271,7 @@ export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?:
             </div>
             <div className="summary-row summary-total">
               <span>MRR</span>
-              <span style={{ color: "var(--accent2)" }}>₹{computedSummary.mrr.toLocaleString("en-IN")}/mo</span>
+              <span style={{ color: "var(--accent2)" }}>{fmt(computedSummary.mrr)}/mo</span>
             </div>
           </div>
         </div>
@@ -276,6 +284,7 @@ export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?:
           </SheetClose>
           <Button
             className="btn btn-primary"
+            style={{ background: "var(--accent2)" }}
             onClick={() => void activateSubscription()}
             disabled={submitting}
           >

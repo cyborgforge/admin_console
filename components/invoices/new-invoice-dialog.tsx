@@ -87,27 +87,21 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     setFromQuote(quoteRef)
     if (quoteRef === "QT-2025-047") {
       setClient("Green Cross Clinic")
-      setEmail("billing@greencross.in")
+      setEmail("green.cross.clinic@business.in")
       setLineItems([
-        { description: "EMR Module", quantity: 1, rate: 15000 },
-        { description: "Appointments Module", quantity: 1, rate: 8000 },
-        { description: "Billing Module", quantity: 1, rate: 6000 },
+        { description: "Clinic Suite — Licence", quantity: 1, rate: 34500 },
       ])
     } else if (quoteRef === "QT-2025-046") {
       setClient("MedPlus Pharma")
       setEmail("billing@medplus.in")
       setLineItems([
-        { description: "POS & Billing", quantity: 1, rate: 18000 },
-        { description: "Inventory Management", quantity: 1, rate: 14000 },
-        { description: "Online Ordering", quantity: 1, rate: 12000 },
+        { description: "Pharmacy Suite — Licence", quantity: 1, rate: 44000 },
       ])
     } else if (quoteRef === "QT-2025-042") {
       setClient("Lifeline Hospital")
       setEmail("accounts@lifeline.org")
       setLineItems([
-        { description: "EMR Module", quantity: 1, rate: 20000 },
-        { description: "Teleconsultation", quantity: 1, rate: 15000 },
-        { description: "Lab Integration", quantity: 1, rate: 12000 },
+        { description: "Clinic Suite — Licence", quantity: 1, rate: 46610 },
       ])
     }
   }
@@ -125,6 +119,8 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     resetForm()
     setSubmitting(false)
   }
+
+  const fmt = (n: number) => "₹" + n.toLocaleString("en-IN")
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -175,7 +171,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
               onChange={(e) => loadFromQuote(e.target.value)}
             >
               <option value="">— select quote —</option>
-              <option value="QT-2025-047">QT-2025-047 · Green Cross</option>
+              <option value="QT-2025-047">QT-2025-047 · Green C…</option>
               <option value="QT-2025-046">QT-2025-046 · MedPlus</option>
               <option value="QT-2025-042">QT-2025-042 · Lifeline</option>
             </select>
@@ -221,6 +217,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                 <Input
                   className="form-input"
                   type="date"
+                  placeholder="dd-mm-yyyy"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                 />
@@ -232,9 +229,22 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
               <div className="section-heading" style={{ marginBottom: 0 }}>Line items</div>
-              <Button className="btn btn-ghost btn-sm" variant="outline" onClick={addLineItem}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{
+                  padding: "4px 10px",
+                  fontSize: "11.5px",
+                  background: "transparent",
+                  border: "1px solid var(--border2)",
+                  borderRadius: "var(--radius-sm)",
+                  color: "var(--text2)",
+                  cursor: "pointer",
+                }}
+                onClick={addLineItem}
+              >
                 + Add item
-              </Button>
+              </button>
             </div>
             <div
               style={{
@@ -248,9 +258,9 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                 <thead>
                   <tr style={{ background: "var(--surface3)" }}>
                     <th className="inv-table-th">Description</th>
-                    <th className="inv-table-th" style={{ textAlign: "right", width: "70px" }}>Qty</th>
-                    <th className="inv-table-th" style={{ textAlign: "right", width: "100px" }}>Rate</th>
-                    <th className="inv-table-th" style={{ textAlign: "right", width: "100px" }}>Amount</th>
+                    <th className="inv-table-th" style={{ textAlign: "center", width: "60px" }}>Qty</th>
+                    <th className="inv-table-th" style={{ textAlign: "right", width: "90px" }}>Rate</th>
+                    <th className="inv-table-th" style={{ textAlign: "right", width: "90px" }}>Amount</th>
                     <th style={{ width: "32px" }}></th>
                   </tr>
                 </thead>
@@ -266,7 +276,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                           onChange={(e) => updateLineItem(index, "description", e.target.value)}
                         />
                       </td>
-                      <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                      <td style={{ padding: "8px 12px", textAlign: "center" }}>
                         <Input
                           className="form-input"
                           style={{ padding: "5px 8px", fontSize: "12.5px", width: "52px", textAlign: "center" }}
@@ -278,7 +288,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                       <td style={{ padding: "8px 12px", textAlign: "right" }}>
                         <Input
                           className="form-input"
-                          style={{ padding: "5px 8px", fontSize: "12.5px", width: "90px", textAlign: "right", fontFamily: "var(--mono)" }}
+                          style={{ padding: "5px 8px", fontSize: "12.5px", width: "80px", textAlign: "right", fontFamily: "var(--mono)" }}
                           type="number"
                           placeholder="0"
                           value={item.rate || ""}
@@ -294,7 +304,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                           color: "var(--accent2)",
                         }}
                       >
-                        ₹{(item.quantity * item.rate).toLocaleString("en-IN")}
+                        {fmt(item.quantity * item.rate)}
                       </td>
                       <td style={{ padding: "8px 12px", textAlign: "center" }}>
                         <button
@@ -362,21 +372,21 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
             <div className="summary-box" style={{ marginTop: "28px" }}>
               <div className="summary-row">
                 <span>Subtotal</span>
-                <span style={{ fontFamily: "var(--mono)" }}>₹{computedTotal.subtotal.toLocaleString("en-IN")}</span>
+                <span style={{ fontFamily: "var(--mono)" }}>{fmt(computedTotal.subtotal)}</span>
               </div>
               <div className="summary-row">
                 <span>Discount</span>
                 <span style={{ fontFamily: "var(--mono)", color: "var(--accent2)" }}>
-                  − ₹{computedTotal.discount.toLocaleString("en-IN")}
+                  − {fmt(computedTotal.discount)}
                 </span>
               </div>
               <div className="summary-row">
                 <span>GST ({gstRate}%)</span>
-                <span style={{ fontFamily: "var(--mono)" }}>₹{computedTotal.gst.toLocaleString("en-IN")}</span>
+                <span style={{ fontFamily: "var(--mono)" }}>{fmt(computedTotal.gst)}</span>
               </div>
               <div className="summary-row summary-total">
                 <span>Total</span>
-                <span style={{ color: "var(--accent2)" }}>₹{computedTotal.total.toLocaleString("en-IN")}</span>
+                <span style={{ color: "var(--accent2)" }}>{fmt(computedTotal.total)}</span>
               </div>
             </div>
           </div>
