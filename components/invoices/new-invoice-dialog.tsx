@@ -147,7 +147,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
           {/* From quote banner */}
           <div
             style={{
-              background: "var(--accent-dim)",
+              background: "#3B82F61F",
               border: "1px solid rgba(59,130,246,0.2)",
               borderRadius: "var(--radius-sm)",
               padding: "12px 14px",
@@ -157,10 +157,10 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
             }}
           >
             <div>
-              <div style={{ fontSize: "12.5px", fontWeight: 500, color: "var(--accent)" }}>
+              <div style={{ fontSize: "12.5px", fontWeight: 500, color: "#3B82F6" }}>
                 Convert from an accepted quote?
               </div>
-              <div style={{ fontSize: "11.5px", color: "var(--text2)", marginTop: "2px" }}>
+              <div style={{ fontSize: "11.5px", color: "#8B95A8", marginTop: "2px" }}>
                 Pick a quote and all line items will be imported automatically
               </div>
             </div>
@@ -287,7 +287,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                       </td>
                       <td style={{ padding: "8px 12px", textAlign: "right" }}>
                         <Input
-                          className="form-input"
+                          className="form-input new-invoice-rate-input"
                           style={{ padding: "5px 8px", fontSize: "12.5px", width: "80px", textAlign: "right", fontFamily: "var(--mono)" }}
                           type="number"
                           placeholder="0"
@@ -301,7 +301,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                           textAlign: "right",
                           fontFamily: "var(--mono)",
                           fontSize: "12.5px",
-                          color: "var(--accent2)",
+                          color: "#10B981",
                         }}
                       >
                         {fmt(item.quantity * item.rate)}
@@ -376,7 +376,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
               </div>
               <div className="summary-row">
                 <span>Discount</span>
-                <span style={{ fontFamily: "var(--mono)", color: "var(--accent2)" }}>
+                <span style={{ fontFamily: "var(--mono)", color: "#10B981" }}>
                   − {fmt(computedTotal.discount)}
                 </span>
               </div>
@@ -385,8 +385,8 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                 <span style={{ fontFamily: "var(--mono)" }}>{fmt(computedTotal.gst)}</span>
               </div>
               <div className="summary-row summary-total">
-                <span>Total</span>
-                <span style={{ color: "var(--accent2)" }}>{fmt(computedTotal.total)}</span>
+                <span style={{ color: "#FFFFFF" }}>Total</span>
+                <span style={{ color: "#10B981" }}>{fmt(computedTotal.total)}</span>
               </div>
             </div>
           </div>
@@ -412,25 +412,23 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
             </Button>
           </SheetClose>
           <Button
-            className="btn btn-ghost"
+            className="btn btn-ghost new-invoice-draft-btn"
             variant="outline"
-            style={{ color: "var(--warn)" }}
             onClick={() => void createInvoice("draft")}
             disabled={submitting}
           >
             {submitting ? "Saving..." : "Save draft"}
           </Button>
           <Button
-            className="btn btn-ghost"
+            className="btn btn-ghost new-invoice-preview-btn"
             variant="outline"
-            style={{ color: "var(--accent)" }}
             onClick={() => toast.success("Preview PDF coming soon")}
             disabled={submitting}
           >
             Preview PDF
           </Button>
           <Button
-            className="btn btn-primary"
+            className="btn btn-primary new-invoice-send-btn"
             onClick={() => void createInvoice("sent")}
             disabled={submitting}
           >

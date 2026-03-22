@@ -604,7 +604,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                   <div className="form-group">
                     <label className="form-label">Price (<span style={{ fontSize: "13px" }}>₹</span>)</label>
                     <Input
-                      className="form-input"
+                      className="form-input quote-custom-price-input"
                       type="number"
                       min="0"
                       placeholder="0"

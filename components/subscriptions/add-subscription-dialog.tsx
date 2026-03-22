@@ -221,7 +221,7 @@ export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?:
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     {mod.isCore && (
-                      <span style={{ fontSize: "10px", color: "var(--accent2)", fontFamily: "var(--mono)" }}>Core</span>
+                      <span className="sub-mod-core" style={{ fontSize: "10px", fontFamily: "var(--mono)" }}>Core</span>
                     )}
                     <div className={`sub-mod-toggle ${mod.enabled ? "on" : ""}`} />
                   </div>
@@ -270,21 +270,20 @@ export function AddSubscriptionDialog({ triggerClassName }: { triggerClassName?:
               <span style={{ fontFamily: "var(--mono)" }}>{computedSummary.cycleLabel}</span>
             </div>
             <div className="summary-row summary-total">
-              <span>MRR</span>
-              <span style={{ color: "var(--accent2)" }}>{fmt(computedSummary.mrr)}/mo</span>
+              <span style={{ color: "#FFFFFF" }}>MRR</span>
+              <span style={{ color: "#10B981" }}>{fmt(computedSummary.mrr)}/mo</span>
             </div>
           </div>
         </div>
 
         <SheetFooter className="panel-footer add-subscription-footer">
           <SheetClose asChild>
-            <Button className="btn btn-ghost" variant="outline" onClick={resetForm} disabled={submitting}>
+            <Button className="btn btn-ghost add-subscription-cancel-btn" variant="outline" onClick={resetForm} disabled={submitting}>
               Cancel
             </Button>
           </SheetClose>
           <Button
-            className="btn btn-primary"
-            style={{ background: "var(--accent2)" }}
+            className="btn btn-primary add-subscription-activate-btn"
             onClick={() => void activateSubscription()}
             disabled={submitting}
           >

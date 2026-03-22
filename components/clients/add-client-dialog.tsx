@@ -148,7 +148,7 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
             <SheetDescription className="panel-subtitle">Fill in the client details below</SheetDescription>
           </div>
           <SheetClose asChild>
-            <button type="button" className="close-btn" aria-label="Close add client panel">
+            <button type="button" className="close-btn" aria-label="Close add client panel" onClick={resetForm}>
               <X size={14} />
             </button>
           </SheetClose>

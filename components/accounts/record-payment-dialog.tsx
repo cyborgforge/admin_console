@@ -114,7 +114,7 @@ export function RecordPaymentDialog({ triggerClassName }: { triggerClassName?: s
             <div className="form-group">
               <label className="form-label">Amount received (₹)</label>
               <Input
-                className="form-input"
+                className="form-input record-payment-amount-input"
                 type="number"
                 placeholder="0"
                 style={{ fontFamily: "var(--mono)" }}
@@ -174,13 +174,12 @@ export function RecordPaymentDialog({ triggerClassName }: { triggerClassName?: s
 
         <SheetFooter className="panel-footer record-payment-footer">
           <SheetClose asChild>
-            <Button className="btn btn-ghost" variant="outline" onClick={resetForm} disabled={submitting}>
+            <Button className="btn btn-ghost record-payment-cancel-btn" variant="outline" onClick={resetForm} disabled={submitting}>
               Cancel
             </Button>
           </SheetClose>
           <Button
-            className="btn btn-primary"
-            style={{ background: "var(--accent2)" }}
+            className="btn btn-primary record-payment-save-btn"
             onClick={() => void savePayment()}
             disabled={submitting}
           >

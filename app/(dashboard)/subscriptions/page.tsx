@@ -144,7 +144,28 @@ export default function SubscriptionsPage() {
           <AlertCircle size={14} />
           {counts.expiring} subscriptions expire within 30 days - send renewal quotes now
         </div>
-        <button type="button" className="btn btn-ghost btn-sm" style={{ borderColor: "rgba(245, 158, 11, 0.35)", color: "var(--warn)" }}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          style={{
+            borderColor: "#8f5f08",
+            borderWidth: "1px",
+            borderStyle: "solid",
+            color: "#f59e0b",
+            borderRadius: "var(--radius-sm)",
+            background: "#2b200c",
+            padding: "7px 14px",
+            fontSize: "13px",
+            fontWeight: 600,
+            lineHeight: 1,
+          }}
+          onClick={() => {
+            setStatus("expiring")
+            setSuite("all")
+            setPlan("all")
+            setQuery("")
+          }}
+        >
           View expiring
         </button>
       </div>
