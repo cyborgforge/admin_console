@@ -30,8 +30,6 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [gst, setGst] = useState("")
-  const [product, setProduct] = useState("Pharmacy Suite")
-  const [status, setStatus] = useState("prospect")
   const [notes, setNotes] = useState("")
   const [saving, setSaving] = useState(false)
   const [selectedInterests, setSelectedInterests] = useState<string[]>(["Pharmacy Suite"])
@@ -64,8 +62,6 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
     setEmail("")
     setPhone("")
     setGst("")
-    setProduct("Pharmacy Suite")
-    setStatus("prospect")
     setNotes("")
     setSelectedInterests(["Pharmacy Suite"])
   }
@@ -93,8 +89,8 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
         city: city.trim() || "Chennai",
         email: email.trim(),
         phone: phone.trim() || "+91 90000 00000",
-        product,
-        status,
+        product: selectedInterests[0] || "Pharmacy Suite",
+        status: "prospect",
         gst: gst.trim() || "-",
         notes: [notes.trim(), selectedInterests.length ? `Interests: ${selectedInterests.join(", ")}` : ""]
           .filter(Boolean)
@@ -208,24 +204,6 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
               <div className="form-group">
                 <label className="form-label">GST number</label>
                 <Input className="form-input" placeholder="29AAAAA0000A1Z5" style={{ fontFamily: "var(--mono)", fontSize: "12px" }} value={gst} onChange={(event) => setGst(event.target.value)} />
-              </div>
-            </div>
-            <div className="form-row" style={{ marginTop: "10px" }}>
-              <div className="form-group">
-                <label className="form-label">Product</label>
-                <select className="form-input" value={product} onChange={(event) => setProduct(event.target.value)}>
-                  <option value="Pharmacy Suite">Pharmacy Suite</option>
-                  <option value="Clinic Suite">Clinic Suite</option>
-                  <option value="Retail Suite">Retail Suite</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Client status</label>
-                <select className="form-input" value={status} onChange={(event) => setStatus(event.target.value)}>
-                  <option value="prospect">Prospect</option>
-                  <option value="active">Active</option>
-                  <option value="churned">Churned</option>
-                </select>
               </div>
             </div>
           </div>

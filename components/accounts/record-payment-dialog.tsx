@@ -29,42 +29,6 @@ export function RecordPaymentDialog({ triggerClassName }: { triggerClassName?: s
   const [notes, setNotes] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
-  const getPaymentTypeBanner = () => {
-    const invoiceAmounts: Record<string, number> = {
-      "INV-2025-024": 58200,
-      "INV-2025-020": 82000,
-      "INV-2025-019": 41600,
-      "INV-2025-017": 38750,
-      "INV-2025-016": 26000,
-      "INV-2025-015": 45000,
-    }
-
-    if (!invoice || !amount) return null
-
-    const invoiceTotal = invoiceAmounts[invoice.split(" ")[0]] ?? 0
-    const paymentAmount = Number(amount) || 0
-
-    if (paymentAmount <= 0) return null
-
-    if (paymentAmount >= invoiceTotal) {
-      return {
-        type: "full",
-        text: "Full payment — Invoice will be marked as Paid",
-        color: "var(--accent2)",
-        bg: "var(--accent2-dim)",
-      }
-    } else {
-      return {
-        type: "partial",
-        text: `Partial payment — ₹${(invoiceTotal - paymentAmount).toLocaleString("en-IN")} remaining`,
-        color: "var(--warn)",
-        bg: "var(--warn-dim)",
-      }
-    }
-  }
-
-  const paymentBanner = getPaymentTypeBanner()
-
   const resetForm = () => {
     setClient("")
     setInvoice("")
@@ -94,7 +58,7 @@ export function RecordPaymentDialog({ triggerClassName }: { triggerClassName?: s
       <SheetTrigger asChild>
         <Button className={triggerClassName} variant="outline">
           <Wallet size={13} />
-          Record Payment
+          Record payment
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="panel record-payment-sheet" showCloseButton={false}>
@@ -137,12 +101,12 @@ export function RecordPaymentDialog({ triggerClassName }: { triggerClassName?: s
               onChange={(e) => setInvoice(e.target.value)}
             >
               <option value="">— select invoice —</option>
-              <option value="INV-2025-024 · Apollo · ₹58,200">INV-2025-024 · Apollo · ₹58,200</option>
-              <option value="INV-2025-020 · Reliance · ₹82,000 (overdue)">INV-2025-020 · Reliance · ₹82,000 (overdue)</option>
-              <option value="INV-2025-019 · Wellness · ₹41,600 (overdue)">INV-2025-019 · Wellness · ₹41,600 (overdue)</option>
-              <option value="INV-2025-017 · Quick Mart · ₹38,750">INV-2025-017 · Quick Mart · ₹38,750</option>
-              <option value="INV-2025-016 · Apollo · ₹26,000 (partial)">INV-2025-016 · Apollo · ₹26,000 (partial)</option>
-              <option value="INV-2025-015 · MedPlus · ₹45,000 (overdue)">INV-2025-015 · MedPlus · ₹45,000 (overdue)</option>
+              <option value="INV-2025-024">INV-2025-024 · Apollo · ₹58,200</option>
+              <option value="INV-2025-020">INV-2025-020 · Reliance · ₹82,000 (overdue)</option>
+              <option value="INV-2025-019">INV-2025-019 · Wellness · ₹41,600 (overdue)</option>
+              <option value="INV-2025-017">INV-2025-017 · Quick Mart · ₹38,750</option>
+              <option value="INV-2025-016">INV-2025-016 · Apollo · ₹26,000 (partial)</option>
+              <option value="INV-2025-015">INV-2025-015 · MedPlus · ₹45,000 (overdue)</option>
             </select>
           </div>
 
@@ -195,22 +159,6 @@ export function RecordPaymentDialog({ triggerClassName }: { triggerClassName?: s
             />
           </div>
 
-          {paymentBanner ? (
-            <div
-              style={{
-                padding: "10px 14px",
-                borderRadius: "var(--radius-sm)",
-                fontSize: "12.5px",
-                fontWeight: 500,
-                color: paymentBanner.color,
-                background: paymentBanner.bg,
-                border: `1px solid ${paymentBanner.color}25`,
-              }}
-            >
-              {paymentBanner.text}
-            </div>
-          ) : null}
-
           <div className="form-group">
             <label className="form-label">Notes</label>
             <Textarea
@@ -232,6 +180,7 @@ export function RecordPaymentDialog({ triggerClassName }: { triggerClassName?: s
           </SheetClose>
           <Button
             className="btn btn-primary"
+            style={{ background: "var(--accent2)" }}
             onClick={() => void savePayment()}
             disabled={submitting}
           >
