@@ -151,6 +151,12 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
   const [activeAddons, setActiveAddons] = useState<Set<string>>(new Set())
   // Custom modules
   const [customModules, setCustomModules] = useState<{ name: string; price: number }[]>([])
+  const [showCoreRestoreList, setShowCoreRestoreList] = useState(false)
+  const [showAddonCatalogue, setShowAddonCatalogue] = useState(false)
+  const [showCustomModuleForm, setShowCustomModuleForm] = useState(false)
+  const [customModuleName, setCustomModuleName] = useState("")
+  const [customModuleSuite, setCustomModuleSuite] = useState("pharmacy")
+  const [customModulePrice, setCustomModulePrice] = useState("")
   // Support items
   const [supportItems, setSupportItems] = useState<SupportItem[]>(DEFAULT_SUPPORT_ITEMS.map((s) => ({ ...s })))
 
@@ -160,7 +166,9 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
   const suite = SUITE_CATALOGUE[product] || SUITE_CATALOGUE.pharmacy
 
   const activeCoreModules = suite.core.filter((m) => !removedCores.has(m.id))
+  const removedCoreModules = suite.core.filter((m) => removedCores.has(m.id))
   const activeAddonModules = suite.addons.filter((m) => activeAddons.has(m.id))
+  const availableAddonModules = suite.addons.filter((m) => !activeAddons.has(m.id))
 
   const computedTotal = useMemo(() => {
     const coreTotal = activeCoreModules.reduce((sum, m) => sum + m.price, 0)
@@ -197,8 +205,14 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
     setNotes("")
     setDiscount("0")
     setRemovedCores(new Set())
+    setShowCoreRestoreList(false)
     setActiveAddons(new Set())
     setCustomModules([])
+    setShowAddonCatalogue(false)
+    setShowCustomModuleForm(false)
+    setCustomModuleName("")
+    setCustomModuleSuite("pharmacy")
+    setCustomModulePrice("")
     setSupportItems(DEFAULT_SUPPORT_ITEMS.map((s) => ({ ...s })))
     setError(null)
   }
@@ -206,7 +220,31 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
   const handleSuiteChange = (newSuite: string) => {
     setProduct(newSuite)
     setRemovedCores(new Set())
+    setShowCoreRestoreList(false)
     setActiveAddons(new Set())
+    setShowAddonCatalogue(false)
+    setShowCustomModuleForm(false)
+    setCustomModuleSuite(newSuite)
+  }
+
+  const openCustomModuleForm = () => {
+    setShowCustomModuleForm(true)
+    setShowAddonCatalogue(false)
+    setCustomModuleSuite(product)
+  }
+
+  const saveCustomModule = () => {
+    const trimmedName = customModuleName.trim()
+    const parsedPrice = Number(customModulePrice)
+
+    if (!trimmedName || !Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      return
+    }
+
+    setCustomModules((prev) => [...prev, { name: trimmedName, price: parsedPrice }])
+    setCustomModuleName("")
+    setCustomModulePrice("")
+    setShowCustomModuleForm(false)
   }
 
   const removeCore = (id: string) => {
@@ -392,17 +430,15 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
               <div className="section-heading" style={{ marginBottom: 0 }}>Core modules</div>
-              {removedCores.size > 0 && (
-                <button
-                  type="button"
-                  className="add-line-btn"
-                  style={{ padding: "4px 10px", fontSize: "11.5px", width: "auto", margin: 0 }}
-                  onClick={() => setRemovedCores(new Set())}
-                >
-                  <Plus size={11} />
-                  Restore module
-                </button>
-              )}
+              <button
+                type="button"
+                className="add-line-btn addon-action-btn"
+                style={{ padding: "4px 10px", fontSize: "11.5px", width: "auto", margin: 0 }}
+                onClick={() => setShowCoreRestoreList((prev) => !prev)}
+              >
+                <Plus size={11} />
+                Restore module
+              </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {activeCoreModules.map((mod) => (
@@ -413,16 +449,17 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                 >
                   <div>
                     <div className="line-item-name">{mod.name}</div>
-                    <div style={{ fontSize: "11px", color: "var(--text3)" }}>{mod.desc}</div>
+                    <div style={{ fontSize: "11px", color: "#4F5A6A" }}>{mod.desc}</div>
                   </div>
                   <span
+                    className="module-badge-core"
                     style={{
                       fontSize: "10px",
-                      padding: "2px 8px",
+                      padding: "2px 6px",
                       borderRadius: "4px",
-                      background: "var(--accent-dim)",
-                      color: "var(--accent)",
-                      fontFamily: "var(--mono)",
+                      background: "#3B82F61F",
+                      color: "#3B82F6",
+                      fontFamily: "var(--font-dm-sans)",
                     }}
                   >
                     Core
@@ -434,13 +471,59 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                 </div>
               ))}
             </div>
+
+            {showCoreRestoreList ? (
+              <div
+                style={{
+                  marginTop: "10px",
+                  border: "1px solid #2A3B57",
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  background: "#1E2229",
+                }}
+              >
+                {removedCoreModules.length === 0 ? (
+                  <div style={{ padding: "12px", color: "#4F5A6A", fontSize: "12px" }}>
+                    All core modules are already in the quote.
+                  </div>
+                ) : (
+                  removedCoreModules.map((mod, idx) => (
+                    <button
+                      key={mod.id}
+                      type="button"
+                      onClick={() => {
+                        restoreCore(mod.id)
+                      }}
+                      style={{
+                        width: "100%",
+                        border: "none",
+                        borderTop: idx === 0 ? "none" : "1px solid #253650",
+                        background: "transparent",
+                        textAlign: "left",
+                        padding: "10px 14px",
+                        display: "grid",
+                        gridTemplateColumns: "1fr 100px",
+                        gap: "8px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span>
+                        <span className="line-item-name" style={{ display: "block" }}>{mod.name}</span>
+                        <span style={{ display: "block", fontSize: "11px", color: "#4F5A6A" }}>{mod.desc}</span>
+                      </span>
+                      <span className="line-item-price" style={{ alignSelf: "center", justifySelf: "end" }}>{fmt(mod.price)}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : null}
           </div>
 
           {/* Add-on modules */}
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
               <div className="section-heading" style={{ marginBottom: 0 }}>Add-on modules</div>
-              <span style={{ fontSize: "11px", color: "var(--text3)" }}>Optional extras</span>
+              <span style={{ fontSize: "11px", color: "#4F5A6A" }}>Optional extras</span>
             </div>
 
             {/* Active addons */}
@@ -454,7 +537,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                   >
                     <div>
                       <div className="line-item-name">{mod.name}</div>
-                      <div style={{ fontSize: "11px", color: "var(--text3)" }}>{mod.desc}</div>
+                      <div style={{ fontSize: "11px", color: "#4F5A6A" }}>{mod.desc}</div>
                     </div>
                     <span
                       style={{
@@ -463,7 +546,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                         borderRadius: "4px",
                         background: "var(--accent2-dim)",
                         color: "var(--accent2)",
-                        fontFamily: "var(--mono)",
+                        fontFamily: "var(--font-dm-sans)",
                       }}
                     >
                       Add-on
@@ -478,44 +561,103 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
             )}
 
             {activeAddonModules.length === 0 && (
-              <div style={{ fontSize: "12px", color: "var(--text3)", padding: "8px 0" }}>
+              <div style={{ fontSize: "12px", color: "#4F5A6A", padding: "8px 0" }}>
                 No add-ons selected yet.
               </div>
             )}
 
+            {showCustomModuleForm ? (
+              <div
+                style={{
+                  marginTop: "8px",
+                  border: "1px solid #3B82F6",
+                  borderRadius: "8px",
+                  background: "#1E2229",
+                  padding: "14px",
+                }}
+              >
+                <div style={{ color: "#3B82F6", fontSize: "14px", marginBottom: "10px", fontWeight: 600 }}>
+                  New custom module
+                </div>
+                <div className="form-row" style={{ gridTemplateColumns: "1fr 1fr 110px", gap: "10px" }}>
+                  <div className="form-group">
+                    <label className="form-label">Module name</label>
+                    <Input
+                      className="form-input"
+                      placeholder="e.g. Loyalty Program"
+                      value={customModuleName}
+                      onChange={(e) => setCustomModuleName(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Suite mapping</label>
+                    <select
+                      className="form-input"
+                      value={customModuleSuite}
+                      onChange={(e) => setCustomModuleSuite(e.target.value)}
+                    >
+                      <option value="pharmacy">Pharmacy Management Suite</option>
+                      <option value="clinic">Clinic Management Suite</option>
+                      <option value="retail">Retail Suite</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Price (<span style={{ fontSize: "13px" }}>₹</span>)</label>
+                    <Input
+                      className="form-input"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={customModulePrice}
+                      onChange={(e) => setCustomModulePrice(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      setShowCustomModuleForm(false)
+                      setCustomModuleName("")
+                      setCustomModulePrice("")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={saveCustomModule}
+                    disabled={!customModuleName.trim() || !customModulePrice || Number(customModulePrice) <= 0}
+                  >
+                    Add module
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             {/* Add-on picker buttons */}
             <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-              <div style={{ flex: 1, position: "relative" }}>
-                <select
-                  className="form-input"
-                  style={{ width: "100%", fontSize: "12px" }}
-                  onChange={(e) => {
-                    if (e.target.value) toggleAddon(e.target.value)
-                    e.target.value = ""
-                  }}
-                  value=""
-                >
-                  <option value="">+ Add from catalogue</option>
-                  {suite.addons
-                    .filter((m) => !activeAddons.has(m.id))
-                    .map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} — {fmt(m.price)}
-                      </option>
-                    ))}
-                </select>
-              </div>
               <button
                 type="button"
-                className="add-line-btn"
+                className="add-line-btn addon-action-btn"
                 style={{ flex: 1 }}
                 onClick={() => {
-                  const name = prompt("Module name:")
-                  if (!name) return
-                  const price = Number(prompt("Price (₹):"))
-                  if (!price || price <= 0) return
-                  setCustomModules((prev) => [...prev, { name, price }])
+                  setShowAddonCatalogue((prev) => !prev)
+                  setShowCustomModuleForm(false)
                 }}
+              >
+                <Plus size={13} />
+                Add from catalogue
+              </button>
+              <button
+                type="button"
+                className="add-line-btn addon-action-btn"
+                style={{ flex: 1 }}
+                onClick={openCustomModuleForm}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 20h9" />
@@ -524,6 +666,50 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                 Type a custom module
               </button>
             </div>
+
+            {showAddonCatalogue ? (
+              <div
+                style={{
+                  marginTop: "10px",
+                  border: "1px solid #2A3B57",
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  background: "#1E2229",
+                }}
+              >
+                {availableAddonModules.length === 0 ? (
+                  <div style={{ padding: "12px", color: "#4F5A6A", fontSize: "12px" }}>
+                    All catalogue modules are already added.
+                  </div>
+                ) : (
+                  availableAddonModules.map((mod, idx) => (
+                    <button
+                      key={mod.id}
+                      type="button"
+                      onClick={() => toggleAddon(mod.id)}
+                      style={{
+                        width: "100%",
+                        border: "none",
+                        borderTop: idx === 0 ? "none" : "1px solid #253650",
+                        background: "transparent",
+                        textAlign: "left",
+                        padding: "10px 14px",
+                        display: "grid",
+                        gridTemplateColumns: "1fr 100px",
+                        gap: "8px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span>
+                        <span className="line-item-name" style={{ display: "block" }}>{mod.name}</span>
+                        <span style={{ display: "block", fontSize: "11px", color: "#4F5A6A" }}>{mod.desc}</span>
+                      </span>
+                      <span className="line-item-price" style={{ alignSelf: "center", justifySelf: "end" }}>{fmt(mod.price)}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : null}
 
             {/* Custom modules */}
             {customModules.length > 0 && (
@@ -536,7 +722,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                   >
                     <div>
                       <div className="line-item-name">{mod.name}</div>
-                      <div style={{ fontSize: "11px", color: "var(--text3)" }}>Custom module</div>
+                      <div style={{ fontSize: "11px", color: "#4F5A6A" }}>Custom module</div>
                     </div>
                     <span
                       style={{
@@ -545,7 +731,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                         borderRadius: "4px",
                         background: "var(--warn-dim)",
                         color: "var(--warn)",
-                        fontFamily: "var(--mono)",
+                        fontFamily: "var(--font-dm-sans)",
                       }}
                     >
                       Custom
@@ -569,7 +755,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
               <div className="section-heading" style={{ marginBottom: 0 }}>Support & training</div>
-              <span style={{ fontSize: "11px", color: "var(--text3)" }}>Optional — recommended</span>
+              <span style={{ fontSize: "11px", color: "#4F5A6A" }}>Optional — recommended</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {supportItems.map((item) => (
@@ -578,13 +764,13 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                   className="line-item"
                   style={{
                     gridTemplateColumns: "1fr 100px 110px 28px",
-                    background: "var(--surface2)",
-                    borderColor: "var(--border)",
+                    background: "#1E2229",
+                    borderColor: "#253650",
                   }}
                 >
                   <div>
                     <div className="line-item-name">{item.name}</div>
-                    <div style={{ fontSize: "11px", color: "var(--text3)" }}>{item.desc}</div>
+                    <div style={{ fontSize: "11px", color: "#4F5A6A" }}>{item.desc}</div>
                   </div>
                   <select
                     className="form-input"
@@ -598,7 +784,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                       </option>
                     ))}
                   </select>
-                  <div className="line-item-price" style={{ color: item.enabled ? "var(--accent2)" : "var(--text3)" }}>
+                  <div className="line-item-price" style={{ color: item.enabled ? "#10B981" : "#4F5A6A" }}>
                     {fmt(item.basePrice * Number(item.selectedOption))}
                   </div>
                   <label style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -606,7 +792,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                       type="checkbox"
                       checked={item.enabled}
                       onChange={() => toggleSupportItem(item.id)}
-                      style={{ accentColor: "var(--accent)", width: "14px", height: "14px" }}
+                      style={{ accentColor: "#3B82F6", width: "14px", height: "14px" }}
                     />
                   </label>
                 </div>
@@ -618,16 +804,17 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
           <div className="summary-box">
             <div className="summary-row">
               <span>Modules subtotal</span>
-              <span style={{ fontFamily: "var(--mono)" }}>{fmt(computedTotal.modulesSubtotal)}</span>
+              <span style={{ fontFamily: "var(--font-dm-mono)" }}>{fmt(computedTotal.modulesSubtotal)}</span>
             </div>
             <div className="summary-row">
               <span>Support & training</span>
-              <span style={{ fontFamily: "var(--mono)" }}>{fmt(computedTotal.supportTotal)}</span>
+              <span style={{ fontFamily: "var(--font-dm-mono)" }}>{fmt(computedTotal.supportTotal)}</span>
             </div>
             <div className="summary-row">
               <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 Discount
                 <input
+                  className="quote-discount-input"
                   type="number"
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
@@ -636,20 +823,17 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                     width: "70px",
                     padding: "3px 6px",
                     fontSize: "12px",
-                    background: "var(--surface3)",
-                    border: "1px solid var(--border2)",
                     borderRadius: "4px",
-                    color: "var(--text)",
-                    fontFamily: "var(--mono)",
+                    fontFamily: "var(--font-dm-mono)",
                   }}
                 />
-                <span style={{ fontSize: "11px", color: "var(--text3)" }}>₹</span>
+                <span style={{ fontSize: "13px", color: "#4F5A6A" }}>₹</span>
               </span>
-              <span style={{ fontFamily: "var(--mono)", color: "var(--accent2)" }}>− {fmt(computedTotal.discount)}</span>
+              <span style={{ fontFamily: "var(--font-dm-mono)", color: "#10B981" }}>− {fmt(computedTotal.discount)}</span>
             </div>
             <div className="summary-row">
               <span>GST (18%)</span>
-              <span style={{ fontFamily: "var(--mono)" }}>{fmt(computedTotal.gst)}</span>
+              <span style={{ fontFamily: "var(--font-dm-mono)" }}>{fmt(computedTotal.gst)}</span>
             </div>
             <div className="summary-row summary-total">
               <span>Total</span>
@@ -682,7 +866,6 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
           <Button
             className="btn btn-ghost quote-draft-btn"
             variant="outline"
-            style={{ color: "var(--warn)" }}
             onClick={() => void createQuotation("draft")}
             disabled={submitting}
           >
