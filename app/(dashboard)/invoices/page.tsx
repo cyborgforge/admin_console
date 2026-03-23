@@ -2,35 +2,8 @@
 
 import { useMemo, useState } from "react"
 import { Search } from "lucide-react"
-
-type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "partial"
-
-type Invoice = {
-  id: string
-  client: string
-  org: string
-  quoteRef: string
-  product: "pharmacy" | "clinic" | "retail"
-  amount: number
-  gst: number
-  total: number
-  status: InvoiceStatus
-  due: string
-  color: string
-}
-
-const invoices: Invoice[] = [
-  { id: "INV-2025-024", client: "Apollo Pharmacy", org: "Apollo Health", quoteRef: "QT-2025-048", product: "pharmacy", amount: 49322, gst: 8878, total: 58200, status: "sent", due: "Apr 15, 2025", color: "#3b82f6" },
-  { id: "INV-2025-023", client: "Green Cross Clinic", org: "GCC Healthcare", quoteRef: "QT-2025-047", product: "clinic", amount: 29237, gst: 5263, total: 34500, status: "paid", due: "Apr 5, 2025", color: "#10b981" },
-  { id: "INV-2025-022", client: "MedPlus Pharma", org: "MedPlus Pvt Ltd", quoteRef: "QT-2025-046", product: "pharmacy", amount: 44000, gst: 7920, total: 51920, status: "paid", due: "Mar 30, 2025", color: "#8b5cf6" },
-  { id: "INV-2025-021", client: "City Hospital", org: "City Health Group", quoteRef: "QT-2025-045", product: "clinic", amount: 24576, gst: 4424, total: 29000, status: "draft", due: "-", color: "#f59e0b" },
-  { id: "INV-2025-020", client: "Reliance Retail", org: "Reliance Industries", quoteRef: "QT-2025-044", product: "retail", amount: 69492, gst: 12508, total: 82000, status: "overdue", due: "Mar 10, 2025", color: "#ef4444" },
-  { id: "INV-2025-019", client: "Wellness First", org: "WF Pharma", quoteRef: "QT-2025-043", product: "pharmacy", amount: 35254, gst: 6346, total: 41600, status: "overdue", due: "Mar 1, 2025", color: "#6b7280" },
-  { id: "INV-2025-018", client: "Lifeline Hospital", org: "Lifeline Trust", quoteRef: "QT-2025-042", product: "clinic", amount: 46610, gst: 8390, total: 55000, status: "paid", due: "Apr 10, 2025", color: "#10b981" },
-  { id: "INV-2025-017", client: "Quick Mart", org: "Quick Retail Chain", quoteRef: "QT-2025-041", product: "retail", amount: 32839, gst: 5911, total: 38750, status: "sent", due: "Apr 20, 2025", color: "#f59e0b" },
-  { id: "INV-2025-016", client: "Apollo Pharmacy", org: "Apollo Health", quoteRef: "QT-2025-036", product: "pharmacy", amount: 22034, gst: 3966, total: 26000, status: "partial", due: "Apr 18, 2025", color: "#3b82f6" },
-  { id: "INV-2025-015", client: "MedPlus Pharma", org: "MedPlus Pvt Ltd", quoteRef: "QT-2025-032", product: "pharmacy", amount: 38136, gst: 6864, total: 45000, status: "overdue", due: "Feb 28, 2025", color: "#8b5cf6" },
-]
+import { useInvoices } from "@/hooks/use-invoices"
+import type { Invoice, InvoiceStatus } from "@/types/invoice"
 
 const statusClassName: Record<InvoiceStatus, string> = {
   draft: "badge-draft",
@@ -66,6 +39,7 @@ const getInitials = (name: string) =>
     .toUpperCase()
 
 export default function InvoicesPage() {
+  const { invoices, loading, error } = useInvoices()
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<"all" | InvoiceStatus>("all")
   const [product, setProduct] = useState<"all" | Invoice["product"]>("all")
@@ -79,7 +53,7 @@ export default function InvoicesPage() {
       paid: invoices.filter((invoice) => invoice.status === "paid").length,
       overdue: invoices.filter((invoice) => invoice.status === "overdue").length,
     }
-  }, [])
+  }, [invoices])
 
   const totals = useMemo(() => {
     const totalInvoiced = invoices.reduce((sum, invoice) => sum + invoice.total, 0)
@@ -94,7 +68,7 @@ export default function InvoicesPage() {
       .reduce((sum, invoice) => sum + invoice.total, 0)
 
     return { totalInvoiced, paid, overdue, pending }
-  }, [])
+  }, [invoices])
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
@@ -105,7 +79,7 @@ export default function InvoicesPage() {
 
       return matchesQuery && matchesStatus && matchesProduct
     })
-  }, [product, query, status])
+  }, [invoices, product, query, status])
 
   return (
     <div className="content" id="section-invoices">
@@ -131,6 +105,9 @@ export default function InvoicesPage() {
           <div className="stat-change" style={{ color: "var(--text2)" }}>Awaiting payment</div>
         </div>
       </div>
+
+      {loading ? <div style={{ color: "var(--text3)", marginBottom: "10px" }}>Loading invoices...</div> : null}
+      {error ? <div style={{ color: "var(--warn)", marginBottom: "10px" }}>{error}</div> : null}
 
       <div className="tabs">
         <button className={`tab ${status === "all" ? "active" : ""}`} onClick={() => setStatus("all")}>All <span style={{ color: "var(--text3)", marginLeft: "4px", fontSize: "11px" }}>{counts.all}</span></button>

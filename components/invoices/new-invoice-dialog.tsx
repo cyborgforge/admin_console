@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
+import { getSupabaseClient } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,17 +18,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-
-type InvoiceLineItem = {
-  description: string
-  quantity: number
-  rate: number
-}
+import type { CreateInvoicePayload, InvoiceLineItem } from "@/types/invoice"
 
 export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: string }) {
   const [open, setOpen] = useState(false)
   const [fromQuote, setFromQuote] = useState("")
   const [client, setClient] = useState("")
+  const [org, setOrg] = useState("")
   const [gstin, setGstin] = useState("")
   const [email, setEmail] = useState("")
   const [dueDate, setDueDate] = useState("")
@@ -57,6 +54,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
   const resetForm = () => {
     setFromQuote("")
     setClient("")
+    setOrg("")
     setGstin("")
     setEmail("")
     setDueDate("")
@@ -87,22 +85,30 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     setFromQuote(quoteRef)
     if (quoteRef === "QT-2025-047") {
       setClient("Green Cross Clinic")
+      setOrg("GCC Healthcare")
       setEmail("green.cross.clinic@business.in")
+      setTaxType("cgst_sgst")
       setLineItems([
         { description: "Clinic Suite — Licence", quantity: 1, rate: 34500 },
       ])
     } else if (quoteRef === "QT-2025-046") {
       setClient("MedPlus Pharma")
+      setOrg("MedPlus Pvt Ltd")
       setEmail("billing@medplus.in")
+      setTaxType("igst")
       setLineItems([
         { description: "Pharmacy Suite — Licence", quantity: 1, rate: 44000 },
       ])
     } else if (quoteRef === "QT-2025-042") {
       setClient("Lifeline Hospital")
+      setOrg("Lifeline Trust")
       setEmail("accounts@lifeline.org")
+      setTaxType("cgst_sgst")
       setLineItems([
         { description: "Clinic Suite — Licence", quantity: 1, rate: 46610 },
       ])
+    } else {
+      setOrg("")
     }
   }
 
@@ -112,12 +118,65 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
       return
     }
 
+    const validLineItems = lineItems.filter((item) => item.description.trim() && item.quantity > 0)
+    if (validLineItems.length === 0) {
+      toast.error("Add at least one valid line item.")
+      return
+    }
+
     setSubmitting(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    toast.success(status === "draft" ? "Invoice saved as draft." : "Invoice sent to client.")
-    setOpen(false)
-    resetForm()
-    setSubmitting(false)
+
+    try {
+      const supabase = getSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const accessToken = session?.access_token
+      if (!accessToken) {
+        throw new Error("Please sign in before creating invoices.")
+      }
+
+      const payload: CreateInvoicePayload = {
+        client,
+        org: org || client,
+        quoteRef: fromQuote || "-",
+        product: taxType === "cgst_sgst" ? "clinic" : "pharmacy",
+        status,
+        due: dueDate || "-",
+        gstin,
+        email,
+        gstRate: Number(gstRate) || 18,
+        taxType: taxType === "cgst_sgst" ? "cgst_sgst" : "igst",
+        discount: Number(discount) || 0,
+        paymentTerms,
+        lineItems: validLineItems,
+      }
+
+      const response = await fetch("/api/invoices", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const responseData = (await response.json()) as { error?: string }
+        throw new Error(responseData.error ?? "Failed to create invoice.")
+      }
+
+      window.dispatchEvent(new CustomEvent("invoice:changed"))
+      toast.success(status === "draft" ? "Invoice saved as draft." : "Invoice sent to client.")
+      setOpen(false)
+      resetForm()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create invoice."
+      toast.error(message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const fmt = (n: number) => "₹" + n.toLocaleString("en-IN")
