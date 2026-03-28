@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { getSupabaseClient } from "@/lib/supabaseClient"
+import { useQuotations } from "@/hooks/use-quotations"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -135,7 +136,9 @@ const DEFAULT_SUPPORT_ITEMS: SupportItem[] = [
 ]
 
 export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string }) {
+  const { quotations } = useQuotations()
   const [open, setOpen] = useState(false)
+  const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [client, setClient] = useState("")
   const [organization, setOrganization] = useState("")
   const [email, setEmail] = useState("")
@@ -210,6 +213,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
     setCustomModules([])
     setShowAddonCatalogue(false)
     setShowCustomModuleForm(false)
+    setShowClientDropdown(false)
     setCustomModuleName("")
     setCustomModuleSuite("pharmacy")
     setCustomModulePrice("")
@@ -283,11 +287,33 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
     )
   }
 
+  const validateEmail = (emailValue: string) => {
+    if (!emailValue.trim()) return true
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(emailValue)
+  }
+
+  const validatePhone = (phoneValue: string) => {
+    if (!phoneValue.trim()) return true
+    const phoneRegex = /^[+]?[\d\s\-()]{10,}$/
+    return phoneRegex.test(phoneValue)
+  }
+
   async function createQuotation(status: "draft" | "sent") {
     setError(null)
 
     if (!client.trim() || !organization.trim()) {
       setError("Client and organization are required.")
+      return
+    }
+
+    if (email.trim() && !validateEmail(email)) {
+      setError("Please enter a valid email address.")
+      return
+    }
+
+    if (phone.trim() && !validatePhone(phone)) {
+      setError("Please enter a valid phone number (minimum 10 digits).")
       return
     }
 
@@ -386,9 +412,79 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
           <div>
             <div className="section-heading">Client details</div>
             <div className="form-row">
-              <div className="form-group">
+              <div className="form-group" style={{ position: "relative" }}>
                 <label className="form-label">Client name</label>
-                <Input className="form-input" placeholder="e.g. Apollo Pharmacy" value={client} onChange={(e) => setClient(e.target.value)} />
+                <div style={{ position: "relative" }}>
+                  <Input 
+                    className="form-input" 
+                    placeholder="e.g. Apollo Pharmacy" 
+                    value={client} 
+                    onChange={(e) => {
+                      setClient(e.target.value)
+                      setShowClientDropdown(true)
+                    }}
+                    onFocus={() => setShowClientDropdown(true)}
+                  />
+                  {showClientDropdown && client.length > 0 && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        background: "var(--surface2)",
+                        border: "1px solid var(--border)",
+                        borderTop: "none",
+                        borderRadius: "0 0 var(--radius-sm) var(--radius-sm)",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        zIndex: 50,
+                      }}
+                    >
+                      {quotations
+                        .filter((q) => q.client.toLowerCase().includes(client.toLowerCase()))
+                        .slice(0, 5)
+                        .map((quote) => (
+                          <button
+                            key={quote.id}
+                            type="button"
+                            onClick={() => {
+                              setClient(quote.client)
+                              setOrganization(quote.organization)
+                              setShowClientDropdown(false)
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "8px 12px",
+                              textAlign: "left",
+                              background: "transparent",
+                              border: "none",
+                              borderBottom: "1px solid var(--border)",
+                              color: "var(--text)",
+                              cursor: "pointer",
+                              fontSize: "13px",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "var(--surface3)"
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "transparent"
+                            }}
+                          >
+                            <div style={{ fontWeight: 500 }}>{quote.client}</div>
+                            <div style={{ fontSize: "11px", color: "var(--text3)" }}>
+                              {quote.organization}
+                            </div>
+                          </button>
+                        ))}
+                      {quotations.filter((q) => q.client.toLowerCase().includes(client.toLowerCase())).length === 0 && (
+                        <div style={{ padding: "8px 12px", color: "var(--text3)", fontSize: "12px" }}>
+                          No matching clients. Create new quote.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Organisation</label>

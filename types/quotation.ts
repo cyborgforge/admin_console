@@ -9,6 +9,10 @@ export type Quotation = {
   status: QuotationStatus
   expiry: string
   color: string
+  createdAt?: string
+  lineItems?: QuotationLineItem[]
+  discount?: number
+  notes?: string
 }
 
 export type QuotationLineItem = {

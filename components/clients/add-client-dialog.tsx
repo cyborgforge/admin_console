@@ -66,9 +66,41 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
     setSelectedInterests(["Pharmacy Suite"])
   }
 
+  const validateEmail = (emailValue: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(emailValue)
+  }
+
+  const validatePhone = (phoneValue: string) => {
+    if (!phoneValue.trim()) return true
+    const phoneRegex = /^[+]?[\d\s\-()]{10,}$/
+    return phoneRegex.test(phoneValue)
+  }
+
+  const validateGST = (gstValue: string) => {
+    if (!gstValue.trim()) return true
+    const gstRegex = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/
+    return gstRegex.test(gstValue)
+  }
+
   async function saveClient() {
     if (!name.trim() || !organization.trim() || !email.trim()) {
       toast.error("Name, organization and email are required.")
+      return
+    }
+
+    if (!validateEmail(email)) {
+      toast.error("Please enter a valid email address.")
+      return
+    }
+
+    if (phone.trim() && !validatePhone(phone)) {
+      toast.error("Please enter a valid phone number (minimum 10 digits).")
+      return
+    }
+
+    if (gst.trim() && !validateGST(gst)) {
+      toast.error("Please enter a valid GST number.")
       return
     }
 
