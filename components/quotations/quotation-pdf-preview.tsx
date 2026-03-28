@@ -1,8 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
-import html2canvas from "html2canvas"
-import jsPDF from "jspdf"
+import { useCallback, useState } from "react"
 import { Download, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -26,30 +24,37 @@ export function QuotationPDFPreview({
   open,
   onOpenChange,
 }: QuotationPDFPreviewProps) {
+  const [isGenerating, setIsGenerating] = useState(false)
   const fmt = (n: number) => "₹" + n.toLocaleString("en-IN")
 
   const generatePDF = useCallback(async () => {
-    const element = document.getElementById(`quotation-pdf-${quotation.id}`)
-    if (!element) return
-
+    setIsGenerating(true)
     try {
-      const canvas = await html2canvas(element, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-      })
-      const imgData = canvas.toDataURL("image/png")
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
+      const response = await fetch("/api/quotations/generate-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ quotation }),
       })
 
-      const imgWidth = 210
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight)
-      pdf.save(`${quotation.id}.pdf`)
+      if (!response.ok) {
+        throw new Error("Failed to generate PDF")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${quotation.id}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
     } catch (error) {
       console.error("Error generating PDF:", error)
+    } finally {
+      setIsGenerating(false)
     }
   }, [quotation])
 
@@ -74,10 +79,11 @@ export function QuotationPDFPreview({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => generatePDF()}
+                onClick={() => void generatePDF()}
+                disabled={isGenerating}
               >
                 <Download size={16} />
-                Download PDF
+                {isGenerating ? "Generating..." : "Download PDF"}
               </Button>
               <button
                 onClick={() => onOpenChange(false)}

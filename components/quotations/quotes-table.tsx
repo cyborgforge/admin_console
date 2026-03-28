@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Eye, Pencil, Send } from "lucide-react"
+import { Eye, Pencil } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -43,11 +43,9 @@ const labels: Record<Quotation["status"], string> = {
 
 export function QuotesTable({
   quotations,
-  onSendToClient,
   onSaveEdit,
 }: {
   quotations: Quotation[]
-  onSendToClient?: (quotationId: string) => Promise<void> | void
   onSaveEdit?: (
     quotationId: string,
     payload: Partial<Pick<Quotation, "client" | "organization" | "product" | "expiry" | "status">>,
@@ -185,15 +183,6 @@ export function QuotesTable({
                     title="Edit quotation"
                   >
                     <Pencil size={13} />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon-xs"
-                    className="icon-btn"
-                    onClick={() => void onSendToClient?.(q.id)}
-                    title="Send message to client"
-                  >
-                    <Send size={13} />
                   </Button>
                 </div>
               </TableCell>
