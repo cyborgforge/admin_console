@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { getSupabaseClient } from "@/lib/supabaseClient"
+import { useQuotations } from "@/hooks/use-quotations"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,10 +19,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { QuotationPDFPreview } from "@/components/quotations/quotation-pdf-preview"
 import type { CreateInvoicePayload, InvoiceLineItem } from "@/types/invoice"
+import type { Quotation } from "@/types/quotation"
 
 export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: string }) {
   const [open, setOpen] = useState(false)
+  const [previewingQuote, setPreviewingQuote] = useState<Quotation | null>(null)
   const [fromQuote, setFromQuote] = useState("")
   const [client, setClient] = useState("")
   const [org, setOrg] = useState("")
@@ -36,6 +40,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
     { description: "", quantity: 1, rate: 0 },
   ])
+  const { quotations } = useQuotations()
 
   const computedTotal = useMemo(() => {
     const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.rate, 0)
@@ -51,6 +56,18 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     }
   }, [lineItems, discount, gstRate])
 
+  const validateEmail = (emailValue: string) => {
+    if (!emailValue.trim()) return true
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(emailValue)
+  }
+
+  const validateGST = (gstValue: string) => {
+    if (!gstValue.trim()) return true
+    const gstRegex = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/
+    return gstRegex.test(gstValue)
+  }
+
   const resetForm = () => {
     setFromQuote("")
     setClient("")
@@ -63,6 +80,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     setDiscount("0")
     setPaymentTerms("")
     setLineItems([{ description: "", quantity: 1, rate: 0 }])
+    setPreviewingQuote(null)
   }
 
   const addLineItem = () => {
@@ -83,38 +101,47 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
 
   const loadFromQuote = (quoteRef: string) => {
     setFromQuote(quoteRef)
-    if (quoteRef === "QT-2025-047") {
-      setClient("Green Cross Clinic")
-      setOrg("GCC Healthcare")
-      setEmail("green.cross.clinic@business.in")
-      setTaxType("cgst_sgst")
-      setLineItems([
-        { description: "Clinic Suite — Licence", quantity: 1, rate: 34500 },
-      ])
-    } else if (quoteRef === "QT-2025-046") {
-      setClient("MedPlus Pharma")
-      setOrg("MedPlus Pvt Ltd")
-      setEmail("billing@medplus.in")
-      setTaxType("igst")
-      setLineItems([
-        { description: "Pharmacy Suite — Licence", quantity: 1, rate: 44000 },
-      ])
-    } else if (quoteRef === "QT-2025-042") {
-      setClient("Lifeline Hospital")
-      setOrg("Lifeline Trust")
-      setEmail("accounts@lifeline.org")
-      setTaxType("cgst_sgst")
-      setLineItems([
-        { description: "Clinic Suite — Licence", quantity: 1, rate: 46610 },
-      ])
-    } else {
+    if (!quoteRef) {
       setOrg("")
+      return
+    }
+
+    const selectedQuote = quotations.find(q => q.id === quoteRef)
+    if (selectedQuote) {
+      setClient(selectedQuote.client)
+      setOrg(selectedQuote.organization)
+      
+      // Create line items from quotation line items
+      if (selectedQuote.lineItems && selectedQuote.lineItems.length > 0) {
+        setLineItems(
+          selectedQuote.lineItems.map((item) => ({
+            description: item.name,
+            quantity: item.quantity,
+            rate: item.unitPrice,
+          }))
+        )
+      } else {
+        // Fallback: create a single line item with the total amount
+        setLineItems([
+          { description: selectedQuote.product, quantity: 1, rate: selectedQuote.amount },
+        ])
+      }
     }
   }
 
   async function createInvoice(status: "draft" | "sent") {
     if (!client.trim()) {
       toast.error("Client name is required.")
+      return
+    }
+
+    if (email.trim() && !validateEmail(email)) {
+      toast.error("Please enter a valid email address.")
+      return
+    }
+
+    if (gstin.trim() && !validateGST(gstin)) {
+      toast.error("Please enter a valid GST number.")
       return
     }
 
@@ -182,6 +209,14 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
   const fmt = (n: number) => "₹" + n.toLocaleString("en-IN")
 
   return (
+    <>
+      {previewingQuote && (
+        <QuotationPDFPreview
+          quotation={previewingQuote}
+          open={Boolean(previewingQuote)}
+          onOpenChange={(open) => !open && setPreviewingQuote(null)}
+        />
+      )}
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button className={triggerClassName}>
@@ -223,17 +258,43 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                 Pick a quote and all line items will be imported automatically
               </div>
             </div>
-            <select
-              className="form-input"
-              style={{ width: "180px", fontSize: "12px" }}
-              value={fromQuote}
-              onChange={(e) => loadFromQuote(e.target.value)}
-            >
-              <option value="">— select quote —</option>
-              <option value="QT-2025-047">QT-2025-047 · Green C…</option>
-              <option value="QT-2025-046">QT-2025-046 · MedPlus</option>
-              <option value="QT-2025-042">QT-2025-042 · Lifeline</option>
-            </select>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <select
+                className="form-input"
+                style={{ width: "180px", fontSize: "12px" }}
+                value={fromQuote}
+                onChange={(e) => {
+                  const selectedQuoteId = e.target.value
+                  const selectedQuote = quotations.find(q => q.id === selectedQuoteId)
+                  if (selectedQuote) {
+                    setPreviewingQuote(selectedQuote)
+                  }
+                  loadFromQuote(selectedQuoteId)
+                }}
+              >
+                <option value="">— select quote —</option>
+                {quotations.map((quote) => (
+                  <option key={quote.id} value={quote.id}>
+                    {quote.id} · {quote.client.substring(0, 15)}…
+                  </option>
+                ))}
+              </select>
+              {fromQuote && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const selectedQuote = quotations.find(q => q.id === fromQuote)
+                    if (selectedQuote) {
+                      setPreviewingQuote(selectedQuote)
+                    }
+                  }}
+                  title="Preview selected quote"
+                >
+                  Preview
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Bill to */}
@@ -496,5 +557,6 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
         </SheetFooter>
       </SheetContent>
     </Sheet>
+    </>
   )
 }

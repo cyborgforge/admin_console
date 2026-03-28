@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { QuotationPDFPreview } from "@/components/quotations/quotation-pdf-preview"
 
 import type { Quotation } from "@/types/quotation"
 
@@ -53,6 +54,7 @@ export function QuotesTable({
   ) => Promise<void> | void
 }) {
   const [viewingQuotation, setViewingQuotation] = useState<Quotation | null>(null)
+  const [previewingQuotation, setPreviewingQuotation] = useState<Quotation | null>(null)
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -115,6 +117,14 @@ export function QuotesTable({
 
   return (
     <>
+      {previewingQuotation && (
+        <QuotationPDFPreview
+          quotation={previewingQuotation}
+          open={Boolean(previewingQuotation)}
+          onOpenChange={(open) => !open && setPreviewingQuotation(null)}
+        />
+      )}
+
       <Table>
         <TableHeader>
           <TableRow>
@@ -162,8 +172,8 @@ export function QuotesTable({
                     variant="outline"
                     size="icon-xs"
                     className="icon-btn"
-                    onClick={() => setViewingQuotation(q)}
-                    title="View quotation"
+                    onClick={() => setPreviewingQuotation(q)}
+                    title="Preview PDF"
                   >
                     <Eye size={13} />
                   </Button>
