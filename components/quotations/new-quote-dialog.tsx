@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
@@ -19,7 +19,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import type { CreateQuotationPayload, QuotationLineItem } from "@/types/quotation"
+import type { CreateQuotationPayload, Quotation, QuotationLineItem, UpdateQuotationPayload } from "@/types/quotation"
 
 type CoreModule = {
   id: string
@@ -135,9 +135,41 @@ const DEFAULT_SUPPORT_ITEMS: SupportItem[] = [
   },
 ]
 
-export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string }) {
+type NewQuoteDialogProps = {
+  triggerClassName?: string
+  mode?: "create" | "edit"
+  open?: boolean
+  hideTrigger?: boolean
+  quotationToEdit?: Quotation | null
+  initialClient?: {
+    name: string
+    organization: string
+    email?: string
+    phone?: string
+  } | null
+  onOpenChange?: (open: boolean) => void
+  onSaveEdit?: (quotationId: string, payload: Omit<UpdateQuotationPayload, "id">) => Promise<void> | void
+}
+
+function getSuiteKey(productLabel: string) {
+  const value = productLabel.toLowerCase()
+  if (value.includes("clinic")) return "clinic"
+  if (value.includes("retail")) return "retail"
+  return "pharmacy"
+}
+
+export function NewQuoteDialog({
+  triggerClassName,
+  mode = "create",
+  open,
+  hideTrigger,
+  quotationToEdit,
+  initialClient,
+  onOpenChange,
+  onSaveEdit,
+}: NewQuoteDialogProps) {
   const { quotations } = useQuotations()
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
   const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [client, setClient] = useState("")
   const [organization, setOrganization] = useState("")
@@ -165,6 +197,36 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailTouched, setEmailTouched] = useState(false)
+  const [phoneTouched, setPhoneTouched] = useState(false)
+
+  const isOpen = typeof open === "boolean" ? open : internalOpen
+
+  const setSheetOpen = (nextOpen: boolean) => {
+    if (typeof open !== "boolean") {
+      setInternalOpen(nextOpen)
+    }
+    onOpenChange?.(nextOpen)
+  }
+
+  // Validation functions
+  const validateEmail = (emailValue: string) => {
+    if (!emailValue.trim()) return true
+    // More flexible email regex that handles most common formats
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(emailValue.toLowerCase())
+  }
+
+  const validatePhone = (phoneValue: string) => {
+    if (!phoneValue.trim()) return true
+    // Remove spaces and special chars for validation, then check minimum digits
+    const digitsOnly = phoneValue.replace(/\D/g, "")
+    return digitsOnly.length >= 10
+  }
+
+  // Validation states
+  const isEmailInvalid = emailTouched && email.trim() && !validateEmail(email)
+  const isPhoneInvalid = phoneTouched && phone.trim() && !validatePhone(phone)
 
   const suite = SUITE_CATALOGUE[product] || SUITE_CATALOGUE.pharmacy
 
@@ -219,7 +281,84 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
     setCustomModulePrice("")
     setSupportItems(DEFAULT_SUPPORT_ITEMS.map((s) => ({ ...s })))
     setError(null)
+    setEmailTouched(false)
+    setPhoneTouched(false)
   }
+
+  useEffect(() => {
+    if (mode !== "edit" || !quotationToEdit || !isOpen) {
+      return
+    }
+
+    const suiteKey = getSuiteKey(quotationToEdit.product)
+    const suiteForEdit = SUITE_CATALOGUE[suiteKey] || SUITE_CATALOGUE.pharmacy
+    const existingLineItems = quotationToEdit.lineItems ?? []
+
+    const coreNames = new Set(suiteForEdit.core.map((item) => item.name))
+    const addonNames = new Set(suiteForEdit.addons.map((item) => item.name))
+    const supportNames = new Set(DEFAULT_SUPPORT_ITEMS.map((item) => item.name))
+
+    const presentItemNames = new Set(existingLineItems.map((item) => item.name))
+    const removedCoreIds = suiteForEdit.core
+      .filter((item) => !presentItemNames.has(item.name))
+      .map((item) => item.id)
+    const activeAddonIds = suiteForEdit.addons
+      .filter((item) => presentItemNames.has(item.name))
+      .map((item) => item.id)
+
+    const mappedSupportItems = DEFAULT_SUPPORT_ITEMS.map((defaultItem) => {
+      const matched = existingLineItems.find((line) => line.name === defaultItem.name)
+      return {
+        ...defaultItem,
+        enabled: Boolean(matched),
+        selectedOption: matched ? String(matched.quantity) : defaultItem.selectedOption,
+      }
+    })
+
+    const customLineItems = existingLineItems
+      .filter(
+        (item) =>
+          !coreNames.has(item.name) &&
+          !addonNames.has(item.name) &&
+          !supportNames.has(item.name),
+      )
+      .map((item) => ({ name: item.name, price: item.unitPrice }))
+
+    setClient(quotationToEdit.client)
+    setOrganization(quotationToEdit.organization)
+    setEmail(quotationToEdit.email ?? "")
+    setPhone(quotationToEdit.phone ?? "")
+    setProduct(suiteKey)
+    setExpiry(quotationToEdit.expiry === "-" ? "" : quotationToEdit.expiry)
+    setNotes(quotationToEdit.notes ?? "")
+    setDiscount(String(quotationToEdit.discount ?? 0))
+    setRemovedCores(new Set(removedCoreIds))
+    setActiveAddons(new Set(activeAddonIds))
+    setCustomModules(customLineItems)
+    setSupportItems(mappedSupportItems)
+    setShowClientDropdown(false)
+    setShowCoreRestoreList(false)
+    setShowAddonCatalogue(false)
+    setShowCustomModuleForm(false)
+    setCustomModuleName("")
+    setCustomModuleSuite(suiteKey)
+    setCustomModulePrice("")
+    setError(null)
+    setEmailTouched(false)
+    setPhoneTouched(false)
+  }, [isOpen, mode, quotationToEdit])
+
+  useEffect(() => {
+    if (mode !== "create" || !isOpen || !initialClient) {
+      return
+    }
+
+    setClient(initialClient.name)
+    setOrganization(initialClient.organization)
+    setEmail(initialClient.email ?? "")
+    setPhone(initialClient.phone ?? "")
+    setShowClientDropdown(false)
+  }, [initialClient, isOpen, mode])
 
   const handleSuiteChange = (newSuite: string) => {
     setProduct(newSuite)
@@ -287,19 +426,7 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
     )
   }
 
-  const validateEmail = (emailValue: string) => {
-    if (!emailValue.trim()) return true
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(emailValue)
-  }
-
-  const validatePhone = (phoneValue: string) => {
-    if (!phoneValue.trim()) return true
-    const phoneRegex = /^[+]?[\d\s\-()]{10,}$/
-    return phoneRegex.test(phoneValue)
-  }
-
-  async function createQuotation(status: "draft" | "sent") {
+  async function submitQuotation(status?: "draft" | "sent") {
     setError(null)
 
     if (!client.trim() || !organization.trim()) {
@@ -349,6 +476,8 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
       const payload: CreateQuotationPayload = {
         client,
         organization,
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
         product: productLabel,
         status,
         expiry: expiry || "-",
@@ -356,6 +485,37 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
         lineItems,
         notes,
       }
+
+      if (mode === "edit") {
+        if (!quotationToEdit || !onSaveEdit) {
+          throw new Error("Quotation details are missing for edit.")
+        }
+
+        const updatePayload: Omit<UpdateQuotationPayload, "id"> = {
+          client: payload.client,
+          organization: payload.organization,
+          email: payload.email,
+          phone: payload.phone,
+          product: payload.product,
+          expiry: payload.expiry,
+          discount: payload.discount,
+          lineItems: payload.lineItems,
+          notes: payload.notes,
+        }
+
+        await onSaveEdit(quotationToEdit.id, updatePayload)
+        window.dispatchEvent(new CustomEvent("quotation:changed"))
+        toast.success("Quotation updated successfully.")
+        setSheetOpen(false)
+        resetForm()
+        return
+      }
+
+      if (!status) {
+        throw new Error("Status is required to create quotation.")
+      }
+
+      payload.status = status
 
       const response = await fetch("/api/quotations", {
         method: "POST",
@@ -373,10 +533,14 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
 
       window.dispatchEvent(new CustomEvent("quotation:changed"))
       toast.success(status === "draft" ? "Quotation saved as draft." : "Quotation sent to client.")
-      setOpen(false)
+      setSheetOpen(false)
       resetForm()
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : "Failed to create quotation."
+      const message = submitError instanceof Error
+        ? submitError.message
+        : mode === "edit"
+          ? "Failed to update quotation."
+          : "Failed to create quotation."
       toast.error(message)
       setError(message)
     } finally {
@@ -387,18 +551,32 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
   const fmt = (n: number) => "₹" + n.toLocaleString("en-IN")
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button className={triggerClassName}>
-          <Plus size={13} />
-          New Quote
-        </Button>
-      </SheetTrigger>
+    <Sheet
+      open={isOpen}
+      onOpenChange={(nextOpen) => {
+        setSheetOpen(nextOpen)
+        if (!nextOpen) {
+          resetForm()
+        }
+      }}
+    >
+      {!hideTrigger ? (
+        <SheetTrigger asChild>
+          <Button className={triggerClassName}>
+            <Plus size={13} />
+            New Quote
+          </Button>
+        </SheetTrigger>
+      ) : null}
       <SheetContent side="right" className="panel quote-composer-sheet" showCloseButton={false}>
         <SheetHeader className="panel-header quote-composer-header">
           <div>
-            <SheetTitle className="panel-title text-(--text)">New Quotation</SheetTitle>
-            <SheetDescription className="panel-subtitle">QT-2025-049 · Draft</SheetDescription>
+            <SheetTitle className="panel-title text-(--text)">
+              {mode === "edit" ? "Edit Quotation" : "New Quotation"}
+            </SheetTitle>
+            <SheetDescription className="panel-subtitle">
+              {mode === "edit" && quotationToEdit ? `${quotationToEdit.id} · ${quotationToEdit.status}` : "QT-2025-049 · Draft"}
+            </SheetDescription>
           </div>
           <SheetClose asChild>
             <button type="button" className="close-btn" aria-label="Close new quotation panel" onClick={resetForm}>
@@ -432,13 +610,14 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                         top: "100%",
                         left: 0,
                         right: 0,
-                        background: "var(--surface2)",
-                        border: "1px solid var(--border)",
+                        background: "#1e2229",
+                        border: "1px solid #2a3b57",
                         borderTop: "none",
                         borderRadius: "0 0 var(--radius-sm) var(--radius-sm)",
                         maxHeight: "200px",
                         overflowY: "auto",
                         zIndex: 50,
+                        boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
                       }}
                     >
                       {quotations
@@ -459,27 +638,27 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
                               textAlign: "left",
                               background: "transparent",
                               border: "none",
-                              borderBottom: "1px solid var(--border)",
-                              color: "var(--text)",
+                              borderBottom: "1px solid #2a3b57",
+                              color: "#e8eaf0",
                               cursor: "pointer",
                               fontSize: "13px",
+                              transition: "all 0.15s ease",
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "var(--surface3)"
+                              e.currentTarget.style.background = "#252b32"
+                              e.currentTarget.style.color = "#3b82f6"
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.background = "transparent"
+                              e.currentTarget.style.color = "#e8eaf0"
                             }}
                           >
-                            <div style={{ fontWeight: 500 }}>{quote.client}</div>
-                            <div style={{ fontSize: "11px", color: "var(--text3)" }}>
-                              {quote.organization}
-                            </div>
+                            {quote.client}
                           </button>
                         ))}
                       {quotations.filter((q) => q.client.toLowerCase().includes(client.toLowerCase())).length === 0 && (
-                        <div style={{ padding: "8px 12px", color: "var(--text3)", fontSize: "12px" }}>
-                          No matching clients. Create new quote.
+                        <div style={{ padding: "10px 12px", color: "#4f5a6a", fontSize: "12px", textAlign: "center", fontStyle: "italic" }}>
+                          No matching clients
                         </div>
                       )}
                     </div>
@@ -494,11 +673,44 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
             <div className="form-row" style={{ marginTop: "10px" }}>
               <div className="form-group">
                 <label className="form-label">Email</label>
-                <Input className="form-input" type="email" placeholder="billing@client.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input 
+                  className="form-input" 
+                  type="email" 
+                  placeholder="billing@client.com" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => setEmailTouched(true)}
+                  onFocus={() => setEmailTouched(true)}
+                  style={{
+                    borderColor: isEmailInvalid ? "#ef4444" : undefined,
+                    backgroundColor: isEmailInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
+                  }}
+                />
+                {isEmailInvalid && (
+                  <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
+                    Please enter a valid email address
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Phone</label>
-                <Input className="form-input" placeholder="+91 98xxx xxxxx" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Input 
+                  className="form-input" 
+                  placeholder="+91 98xxx xxxxx" 
+                  value={phone} 
+                  onChange={(e) => setPhone(e.target.value)}
+                  onBlur={() => setPhoneTouched(true)}
+                  onFocus={() => setPhoneTouched(true)}
+                  style={{
+                    borderColor: isPhoneInvalid ? "#ef4444" : undefined,
+                    backgroundColor: isPhoneInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
+                  }}
+                />
+                {isPhoneInvalid && (
+                  <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
+                    Please enter a valid phone number (minimum 10 digits)
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -962,18 +1174,20 @@ export function NewQuoteDialog({ triggerClassName }: { triggerClassName?: string
           <Button
             className="btn btn-ghost quote-draft-btn"
             variant="outline"
-            onClick={() => void createQuotation("draft")}
+            onClick={() => void submitQuotation(mode === "edit" ? undefined : "draft")}
             disabled={submitting}
           >
-            {submitting ? "Saving..." : "Save as draft"}
+            {submitting ? "Saving..." : mode === "edit" ? "Save changes" : "Save as draft"}
           </Button>
-          <Button
-            className="btn btn-primary quote-send-btn"
-            onClick={() => void createQuotation("sent")}
-            disabled={submitting}
-          >
-            {submitting ? "Sending..." : "Send to client →"}
-          </Button>
+          {mode === "create" ? (
+            <Button
+              className="btn btn-primary quote-send-btn"
+              onClick={() => void submitQuotation("sent")}
+              disabled={submitting}
+            >
+              {submitting ? "Sending..." : "Send to client →"}
+            </Button>
+          ) : null}
         </SheetFooter>
       </SheetContent>
     </Sheet>

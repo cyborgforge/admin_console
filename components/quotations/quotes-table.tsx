@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Eye, Pencil } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { NewQuoteDialog } from "@/components/quotations/new-quote-dialog"
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table"
 import { QuotationPDFPreview } from "@/components/quotations/quotation-pdf-preview"
 
-import type { Quotation } from "@/types/quotation"
+import type { Quotation, UpdateQuotationPayload } from "@/types/quotation"
 
 function badgeClass(status: Quotation["status"]) {
   if (status === "draft") return "badge badge-draft"
@@ -46,21 +46,11 @@ export function QuotesTable({
   onSaveEdit,
 }: {
   quotations: Quotation[]
-  onSaveEdit?: (
-    quotationId: string,
-    payload: Partial<Pick<Quotation, "client" | "organization" | "product" | "expiry" | "status">>,
-  ) => Promise<void> | void
+  onSaveEdit?: (quotationId: string, payload: Omit<UpdateQuotationPayload, "id">) => Promise<void> | void
 }) {
   const [viewingQuotation, setViewingQuotation] = useState<Quotation | null>(null)
   const [previewingQuotation, setPreviewingQuotation] = useState<Quotation | null>(null)
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  const [editClient, setEditClient] = useState("")
-  const [editOrganization, setEditOrganization] = useState("")
-  const [editProduct, setEditProduct] = useState("")
-  const [editExpiry, setEditExpiry] = useState("")
-  const [editStatus, setEditStatus] = useState<Quotation["status"]>("draft")
 
   const quotationInitials = useMemo(() => {
     if (!viewingQuotation) {
@@ -73,36 +63,6 @@ export function QuotesTable({
       .join("")
       .slice(0, 2)
   }, [viewingQuotation])
-
-  function openEditDialog(quotation: Quotation) {
-    setEditingQuotation(quotation)
-    setEditClient(quotation.client)
-    setEditOrganization(quotation.organization)
-    setEditProduct(quotation.product)
-    setEditExpiry(quotation.expiry === "-" ? "" : quotation.expiry)
-    setEditStatus(quotation.status)
-  }
-
-  async function handleSaveEdit() {
-    if (!editingQuotation || !onSaveEdit) {
-      setEditingQuotation(null)
-      return
-    }
-
-    setSaving(true)
-    try {
-      await onSaveEdit(editingQuotation.id, {
-        client: editClient.trim(),
-        organization: editOrganization.trim(),
-        product: editProduct.trim(),
-        expiry: editExpiry.trim() || "-",
-        status: editStatus,
-      })
-      setEditingQuotation(null)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   if (quotations.length === 0) {
     return (
@@ -122,6 +82,19 @@ export function QuotesTable({
           onOpenChange={(open) => !open && setPreviewingQuotation(null)}
         />
       )}
+
+      <NewQuoteDialog
+        mode="edit"
+        hideTrigger
+        open={Boolean(editingQuotation)}
+        quotationToEdit={editingQuotation}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingQuotation(null)
+          }
+        }}
+        onSaveEdit={onSaveEdit}
+      />
 
       <Table>
         <TableHeader>
@@ -179,7 +152,7 @@ export function QuotesTable({
                     variant="outline"
                     size="icon-xs"
                     className="icon-btn"
-                    onClick={() => openEditDialog(q)}
+                    onClick={() => setEditingQuotation(q)}
                     title="Edit quotation"
                   >
                     <Pencil size={13} />
@@ -222,50 +195,6 @@ export function QuotesTable({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(editingQuotation)} onOpenChange={(open) => !open && setEditingQuotation(null)}>
-        <DialogContent className="max-w-xl!">
-          {editingQuotation ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>Edit {editingQuotation.id}</DialogTitle>
-                <DialogDescription>Update and save quotation details</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-3 px-6 pb-2">
-                <div className="form-group">
-                  <label className="form-label">Client</label>
-                  <Input className="form-input" value={editClient} onChange={(event) => setEditClient(event.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Organization</label>
-                  <Input className="form-input" value={editOrganization} onChange={(event) => setEditOrganization(event.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Product</label>
-                  <Input className="form-input" value={editProduct} onChange={(event) => setEditProduct(event.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Expiry</label>
-                  <Input className="form-input" value={editExpiry} onChange={(event) => setEditExpiry(event.target.value)} placeholder="Apr 10, 2026" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select className="form-input" value={editStatus} onChange={(event) => setEditStatus(event.target.value as Quotation["status"])}>
-                    <option value="draft">Draft</option>
-                    <option value="review">In Review</option>
-                    <option value="sent">Sent</option>
-                    <option value="accepted">Accepted</option>
-                    <option value="expired">Expired</option>
-                  </select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingQuotation(null)} disabled={saving}>Cancel</Button>
-                <Button onClick={() => void handleSaveEdit()} disabled={saving}>{saving ? "Saving..." : "Save changes"}</Button>
-              </DialogFooter>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

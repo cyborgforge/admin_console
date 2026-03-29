@@ -7,6 +7,27 @@ import type { Quotation, UpdateQuotationPayload } from "@/types/quotation"
 
 const QUOTATIONS_TABLE = process.env.NEXT_PUBLIC_SUPABASE_QUOTATIONS_TABLE ?? "quotations"
 
+function parseLineItems(value: unknown): Quotation["lineItems"] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      const record = item as Record<string, unknown>
+      const name = typeof record.name === "string" ? record.name.trim() : ""
+      const quantity = typeof record.quantity === "number" ? record.quantity : Number(record.quantity ?? 0)
+      const unitPrice = typeof record.unitPrice === "number" ? record.unitPrice : Number(record.unitPrice ?? 0)
+
+      return {
+        name,
+        quantity: Number.isFinite(quantity) ? quantity : 0,
+        unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+      }
+    })
+    .filter((line) => line.name.length > 0 && line.quantity > 0)
+}
+
 function mapQuotation(row: Record<string, unknown>): Quotation {
   const rawStatus = row.status
   const status: Quotation["status"] =
@@ -19,16 +40,24 @@ function mapQuotation(row: Record<string, unknown>): Quotation {
       : "draft"
 
   const parsedAmount = typeof row.amount === "number" ? row.amount : Number(row.amount ?? 0)
+  const parsedDiscount = typeof row.discount === "number" ? row.discount : Number(row.discount ?? 0)
+  const lineItems = parseLineItems(row.line_items)
 
   return {
     id: typeof row.id === "string" && row.id ? row.id : `QT-${Date.now()}`,
     client: typeof row.client === "string" ? row.client : "New Client",
     organization: typeof row.organization === "string" ? row.organization : "New Organization",
+    email: typeof row.email === "string" ? row.email : undefined,
+    phone: typeof row.phone === "string" ? row.phone : undefined,
     product: typeof row.product === "string" ? row.product : "Pharmacy Suite",
     amount: Number.isFinite(parsedAmount) ? parsedAmount : 0,
     status,
     expiry: typeof row.expiry === "string" ? row.expiry : "-",
     color: typeof row.color === "string" ? row.color : "#3b82f6",
+    createdAt: typeof row.created_at === "string" ? row.created_at : undefined,
+    discount: Number.isFinite(parsedDiscount) ? parsedDiscount : 0,
+    notes: typeof row.notes === "string" ? row.notes : undefined,
+    lineItems,
   }
 }
 
@@ -44,7 +73,7 @@ export function useQuotations() {
       const supabase = getSupabaseClient()
       const { data, error: supabaseError } = await supabase
         .from(QUOTATIONS_TABLE)
-        .select("id, client, organization, product, amount, status, expiry, color")
+        .select("*")
         .order("created_at", { ascending: false })
 
       if (supabaseError) {

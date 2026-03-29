@@ -4,6 +4,8 @@ export type Quotation = {
   id: string
   client: string
   organization: string
+  email?: string
+  phone?: string
   product: string
   amount: number
   status: QuotationStatus
@@ -24,6 +26,8 @@ export type QuotationLineItem = {
 export type CreateQuotationPayload = {
   client: string
   organization: string
+  email?: string
+  phone?: string
   product: string
   status?: QuotationStatus
   expiry?: string
@@ -38,6 +42,8 @@ export type UpdateQuotationPayload = {
   id: string
   client?: string
   organization?: string
+  email?: string
+  phone?: string
   product?: string
   color?: string
   status?: QuotationStatus

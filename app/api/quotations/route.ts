@@ -48,16 +48,23 @@ function readNumber(value: unknown, fallback = 0) {
 function mapQuotation(row: Record<string, unknown>): Quotation {
   const rawStatus = row.status
   const status = isQuotationStatus(rawStatus) ? rawStatus : "draft"
+  const lineItems = sanitizeLineItems(row.line_items)
 
   return {
     id: readString(row.id) || `QT-${Date.now()}`,
     client: readString(row.client, "New Client"),
     organization: readString(row.organization, "New Organization"),
+    email: readString(row.email),
+    phone: readString(row.phone),
     product: readString(row.product, "Pharmacy Suite"),
     amount: readNumber(row.amount, 0),
     status,
     expiry: readString(row.expiry, "-"),
     color: readString(row.color, "#3b82f6"),
+    createdAt: readString(row.created_at),
+    discount: readNumber(row.discount, 0),
+    notes: readString(row.notes),
+    lineItems,
   }
 }
 
@@ -111,6 +118,8 @@ function ensureCreatePayload(payload: Partial<CreateQuotationPayload>) {
   return {
     client,
     organization,
+    email: readString(payload.email),
+    phone: readString(payload.phone),
     product,
     lineItems,
     amount,
@@ -137,6 +146,14 @@ function buildUpdateData(payload: UpdateQuotationPayload) {
     if (organization) {
       updateData.organization = organization
     }
+  }
+
+  if (typeof payload.email === "string") {
+    updateData.email = payload.email.trim()
+  }
+
+  if (typeof payload.phone === "string") {
+    updateData.phone = payload.phone.trim()
   }
 
   if (typeof payload.product === "string") {
@@ -223,7 +240,7 @@ export async function GET() {
     const supabase = getSupabaseServerClient()
     const { data, error } = await supabase
       .from(QUOTATIONS_TABLE)
-      .select("id, client, organization, product, amount, status, expiry, color")
+      .select("*")
       .order("created_at", { ascending: false })
 
     if (error) {
@@ -250,6 +267,8 @@ export async function POST(request: Request) {
     const insertData = {
       client: normalized.client,
       organization: normalized.organization,
+      email: normalized.email,
+      phone: normalized.phone,
       product: normalized.product,
       amount: normalized.amount,
       status: normalized.status,
@@ -263,7 +282,7 @@ export async function POST(request: Request) {
     const { data, error } = await authResult.supabase
       .from(QUOTATIONS_TABLE)
       .insert(insertData)
-      .select("id, client, organization, product, amount, status, expiry, color")
+      .select("*")
       .single()
 
     if (error || !data) {
@@ -305,7 +324,7 @@ export async function PATCH(request: Request) {
       .from(QUOTATIONS_TABLE)
       .update(updateData)
       .eq("id", quotationId)
-      .select("id, client, organization, product, amount, status, expiry, color")
+      .select("*")
       .single()
 
     if (error || !data) {

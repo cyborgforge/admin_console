@@ -7,9 +7,10 @@ import { QuoteCard } from "@/components/quotations/quote-card"
 import { QuoteFilters, type QuoteFilterStatus } from "@/components/quotations/quote-filters"
 import { QuotesTable } from "@/components/quotations/quotes-table"
 import { useQuotations } from "@/hooks/use-quotations"
+import type { UpdateQuotationPayload } from "@/types/quotation"
 
 export default function QuotationsPage() {
-  const { quotations, loading, error, updateQuotation, updateQuotationStatus } = useQuotations()
+  const { quotations, loading, error, updateQuotation } = useQuotations()
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<QuoteFilterStatus>("all")
 
@@ -38,25 +39,9 @@ export default function QuotationsPage() {
     return `Rs ${total.toLocaleString("en-IN")}`
   }, [quotations])
 
-  const handleSendToClient = async (quotationId: string) => {
-    try {
-      await updateQuotationStatus(quotationId, "sent")
-      toast.success("Quotation sent to client.")
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to update quotation status."
-      toast.error(message)
-    }
-  }
-
   const handleSaveEdit = async (
     quotationId: string,
-    payload: {
-      client?: string
-      organization?: string
-      product?: string
-      expiry?: string
-      status?: "draft" | "sent" | "accepted" | "expired" | "review"
-    },
+    payload: Omit<UpdateQuotationPayload, "id">,
   ) => {
     try {
       await updateQuotation({ id: quotationId, ...payload })
@@ -92,7 +77,6 @@ export default function QuotationsPage() {
       <div className="table-wrap">
         <QuotesTable
           quotations={filteredQuotations}
-          onSendToClient={(quotationId) => handleSendToClient(quotationId)}
           onSaveEdit={(quotationId, payload) => handleSaveEdit(quotationId, payload)}
         />
       </div>

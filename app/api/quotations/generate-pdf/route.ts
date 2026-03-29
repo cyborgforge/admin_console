@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
 
     // Launch browser and generate PDF
     const browser = await puppeteer.launch({
-      headless: "new",
+      headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     })
 
@@ -302,8 +302,9 @@ export async function POST(request: NextRequest) {
     })
 
     await browser.close()
+    const pdfBytes = Uint8Array.from(pdfBuffer)
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBytes, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${quotation.id}.pdf"`,

@@ -19,7 +19,13 @@ const labels: Record<Client["status"], string> = {
   churned: "Churned",
 }
 
-export function ClientTable({ clients }: { clients: Client[] }) {
+export function ClientTable({
+  clients,
+  onRowClick,
+}: {
+  clients: Client[]
+  onRowClick?: (client: Client) => void
+}) {
   return (
     <Table>
       <TableHeader>
@@ -34,7 +40,11 @@ export function ClientTable({ clients }: { clients: Client[] }) {
       </TableHeader>
       <TableBody>
         {clients.map((client) => (
-          <TableRow key={client.id}>
+          <TableRow
+            key={client.id}
+            className="cursor-pointer"
+            onClick={() => onRowClick?.(client)}
+          >
             <TableCell>
               <div className="client-cell">
                 <div className="client-avatar" style={{ backgroundColor: `${client.color}22`, color: client.color }}>

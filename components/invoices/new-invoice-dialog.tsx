@@ -37,10 +37,25 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
   const [discount, setDiscount] = useState("0")
   const [paymentTerms, setPaymentTerms] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [previewingPdf, setPreviewingPdf] = useState(false)
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
     { description: "", quantity: 1, rate: 0 },
   ])
   const { quotations } = useQuotations()
+
+  type InvoicePdfPayload = {
+    id: string
+    client: string
+    org: string
+    email?: string
+    due: string
+    gstin?: string
+    gstRate: number
+    taxType: "igst" | "cgst_sgst"
+    discount: number
+    paymentTerms?: string
+    lineItems: InvoiceLineItem[]
+  }
 
   const computedTotal = useMemo(() => {
     const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.rate, 0)
@@ -81,6 +96,85 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     setPaymentTerms("")
     setLineItems([{ description: "", quantity: 1, rate: 0 }])
     setPreviewingQuote(null)
+  }
+
+  const buildInvoicePdfPayload = (invoiceId: string): InvoicePdfPayload => {
+    const validLineItems = lineItems.filter((item) => item.description.trim() && item.quantity > 0)
+
+    return {
+      id: invoiceId,
+      client: client.trim(),
+      org: (org || client).trim(),
+      email: email.trim() || undefined,
+      due: dueDate || "-",
+      gstin: gstin.trim() || undefined,
+      gstRate: Number(gstRate) || 18,
+      taxType: taxType === "cgst_sgst" ? "cgst_sgst" : "igst",
+      discount: Number(discount) || 0,
+      paymentTerms: paymentTerms.trim() || undefined,
+      lineItems: validLineItems,
+    }
+  }
+
+  async function previewInvoicePDF() {
+    const validLineItems = lineItems.filter((item) => item.description.trim() && item.quantity > 0)
+
+    if (!client.trim()) {
+      toast.error("Client name is required.")
+      return
+    }
+
+    if (validLineItems.length === 0) {
+      toast.error("Add at least one valid line item.")
+      return
+    }
+
+    setPreviewingPdf(true)
+
+    try {
+      const supabase = getSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const accessToken = session?.access_token
+      if (!accessToken) {
+        throw new Error("Please sign in before generating invoice PDF.")
+      }
+
+      const payload = buildInvoicePdfPayload(fromQuote || `INV-DRAFT-${Date.now()}`)
+
+      const response = await fetch("/api/invoices/generate-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ invoice: payload }),
+      })
+
+      if (!response.ok) {
+        const errorData = (await response.json()) as { error?: string }
+        throw new Error(errorData.error ?? "Failed to generate invoice PDF")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = `${payload.id}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(anchor)
+
+      toast.success("Invoice PDF downloaded successfully!")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate invoice PDF"
+      toast.error(message)
+    } finally {
+      setPreviewingPdf(false)
+    }
   }
 
   const addLineItem = () => {
@@ -140,6 +234,11 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
       return
     }
 
+    if (status === "sent" && !email.trim()) {
+      toast.error("Client email is required to send invoice.")
+      return
+    }
+
     if (gstin.trim() && !validateGST(gstin)) {
       toast.error("Please enter a valid GST number.")
       return
@@ -192,6 +291,26 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
       if (!response.ok) {
         const responseData = (await response.json()) as { error?: string }
         throw new Error(responseData.error ?? "Failed to create invoice.")
+      }
+
+      const responseData = (await response.json()) as { invoice?: { id: string } }
+      const createdInvoiceId = responseData.invoice?.id ?? `INV-${Date.now()}`
+
+      if (status === "sent") {
+        const deliveryPayload = buildInvoicePdfPayload(createdInvoiceId)
+        const sendResponse = await fetch("/api/invoices/send-to-client", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ invoice: deliveryPayload }),
+        })
+
+        if (!sendResponse.ok) {
+          const sendError = (await sendResponse.json()) as { error?: string }
+          throw new Error(sendError.error ?? "Invoice created but failed to send email.")
+        }
       }
 
       window.dispatchEvent(new CustomEvent("invoice:changed"))
@@ -275,7 +394,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
                 <option value="">— select quote —</option>
                 {quotations.map((quote) => (
                   <option key={quote.id} value={quote.id}>
-                    {quote.id} · {quote.client.substring(0, 15)}…
+                    {quote.id} · {quote.client} · {quote.status}
                   </option>
                 ))}
               </select>
@@ -542,10 +661,10 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
           <Button
             className="btn btn-ghost new-invoice-preview-btn"
             variant="outline"
-            onClick={() => toast.success("Preview PDF coming soon")}
-            disabled={submitting}
+            onClick={() => void previewInvoicePDF()}
+            disabled={submitting || previewingPdf}
           >
-            Preview PDF
+            {previewingPdf ? "Generating..." : "Preview PDF"}
           </Button>
           <Button
             className="btn btn-primary new-invoice-send-btn"

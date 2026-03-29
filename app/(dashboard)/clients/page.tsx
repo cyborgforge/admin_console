@@ -1,22 +1,47 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { LayoutGrid, Rows3 } from "lucide-react"
+import { LayoutGrid, Rows3, X } from "lucide-react"
 import { useRef } from "react"
 
 import { ClientCard } from "@/components/clients/client-card"
 import { ClientTable } from "@/components/clients/client-table"
+import { NewQuoteDialog } from "@/components/quotations/new-quote-dialog"
 import { getSupabaseClient } from "@/lib/supabaseClient"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
 import type { Client } from "@/types/client"
 
 type ClientChangedDetail = {
   client?: Client
+}
+
+const clientStatusLabel: Record<Client["status"], string> = {
+  active: "Active",
+  prospect: "Prospect",
+  churned: "Churned",
+}
+
+function clientStatusBadgeClass(status: Client["status"]) {
+  if (status === "active") return "badge badge-accepted"
+  if (status === "prospect") return "badge badge-review"
+  return "badge badge-draft"
 }
 
 export default function ClientsPage() {
@@ -28,6 +53,8 @@ export default function ClientsPage() {
   const [product, setProduct] = useState("")
   const [view, setView] = useState<"grid" | "list">("grid")
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [newQuoteOpen, setNewQuoteOpen] = useState(false)
+  const [quoteSeedClient, setQuoteSeedClient] = useState<Client | null>(null)
   const optimisticClientIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
@@ -178,45 +205,146 @@ export default function ClientsPage() {
         </div>
       ) : (
         <div className="table-wrap">
-          <ClientTable clients={filteredClients} />
+          <ClientTable clients={filteredClients} onRowClick={(client) => setSelectedClient(client)} />
         </div>
       )}
 
-      <Dialog open={Boolean(selectedClient)} onOpenChange={(open) => !open && setSelectedClient(null)}>
-        <DialogContent className="client-detail-panel panel max-w-none! border-border! bg-(--surface)! p-0! text-(--text)" showCloseButton={false}>
+      <Sheet open={Boolean(selectedClient)} onOpenChange={(open) => !open && setSelectedClient(null)}>
+        <SheetContent side="right" className="panel add-client-sheet" showCloseButton={false}>
           {selectedClient ? (
             <>
-              <DialogHeader className="panel-header">
-                <DialogTitle className="panel-title text-(--text)">
-                  {selectedClient.name} · {selectedClient.role}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="panel-body">
+              <SheetHeader className="panel-header add-client-header">
+                <div className="client-cell" style={{ alignItems: "center", gap: "12px" }}>
+                  <div className="client-avatar" style={{ width: "34px", height: "34px", backgroundColor: `${selectedClient.color}22`, color: selectedClient.color }}>
+                    {selectedClient.name
+                      .split(" ")
+                      .map((word) => word[0])
+                      .join("")
+                      .slice(0, 2)}
+                  </div>
+                  <div>
+                    <SheetTitle className="panel-title text-(--text)">{selectedClient.name} · {selectedClient.role}</SheetTitle>
+                    <SheetDescription className="panel-subtitle" style={{ marginTop: "2px" }}>
+                      {selectedClient.organization} · {selectedClient.city}
+                    </SheetDescription>
+                  </div>
+                </div>
+                <SheetClose asChild>
+                  <button
+                    type="button"
+                    className="close-btn"
+                    aria-label="Close client details"
+                    onClick={() => setSelectedClient(null)}
+                  >
+                    <X size={14} />
+                  </button>
+                </SheetClose>
+              </SheetHeader>
+              <div className="panel-body add-client-body">
                 <div className="client-detail-grid">
                   <div className="info-row"><div className="info-row-label">Email</div><div className="info-row-val">{selectedClient.email}</div></div>
                   <div className="info-row"><div className="info-row-label">Phone</div><div className="info-row-val">{selectedClient.phone}</div></div>
                   <div className="info-row"><div className="info-row-label">Industry</div><div className="info-row-val">{selectedClient.industry}</div></div>
                   <div className="info-row"><div className="info-row-label">Product</div><div className="info-row-val">{selectedClient.product}</div></div>
+                  <div className="info-row"><div className="info-row-label">GST Number</div><div className="info-row-val">{selectedClient.gst || "-"}</div></div>
+                  <div className="info-row"><div className="info-row-label">Client since</div><div className="info-row-val">{selectedClient.since}</div></div>
+                  <div className="info-row">
+                    <div className="info-row-label">Status</div>
+                    <div className="info-row-val">
+                      <span className={clientStatusBadgeClass(selectedClient.status)}>{clientStatusLabel[selectedClient.status]}</span>
+                    </div>
+                  </div>
+                  <div className="info-row"><div className="info-row-label">Notes</div><div className="info-row-val">{selectedClient.notes || "No notes yet"}</div></div>
                 </div>
                 <div className="client-detail-stats">
                   <div className="stat-card" style={{ padding: "12px 14px" }}>
                     <div className="stat-label">Total billed</div>
-                    <div className="stat-val" style={{ fontSize: "20px", color: "var(--accent2)" }}>Rs {selectedClient.totalBilled.toLocaleString("en-IN")}</div>
+                    <div className="stat-val" style={{ fontSize: "20px", color: "#10B981" }}>Rs {selectedClient.totalBilled.toLocaleString("en-IN")}</div>
                   </div>
                   <div className="stat-card" style={{ padding: "12px 14px" }}>
                     <div className="stat-label">Total quotes</div>
-                    <div className="stat-val" style={{ fontSize: "20px" }}>{selectedClient.quotes}</div>
+                    <div className="stat-val" style={{ fontSize: "20px", color: "#E8EAF0" }}>{selectedClient.quotes}</div>
                   </div>
                   <div className="stat-card" style={{ padding: "12px 14px" }}>
                     <div className="stat-label">Client since</div>
-                    <div className="stat-val" style={{ fontSize: "20px" }}>{selectedClient.since}</div>
+                    <div className="stat-val" style={{ fontSize: "20px", color: "#E8EAF0" }}>{selectedClient.since}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="section-heading" style={{ marginBottom: "10px" }}>Quote history</div>
+                  <div
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius)",
+                      overflow: "hidden",
+                      background: "var(--surface)",
+                    }}
+                  >
+                    <Table className="client-detail-history-table">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ID</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Expiry</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell colSpan={5} style={{ color: "var(--text3)", textAlign: "center", padding: "18px" }}>
+                            No quotes yet for this client
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
               </div>
+
+              <SheetFooter className="panel-footer add-client-footer">
+                <SheetClose asChild>
+                  <Button variant="outline" className="btn btn-ghost" onClick={() => setSelectedClient(null)}>
+                    Close
+                  </Button>
+                </SheetClose>
+                <Button
+                  variant="outline"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    if (!selectedClient) {
+                      return
+                    }
+                    setQuoteSeedClient(selectedClient)
+                    setSelectedClient(null)
+                    setNewQuoteOpen(true)
+                  }}
+                >
+                  New quote for client
+                </Button>
+              </SheetFooter>
             </>
           ) : null}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
+
+      <NewQuoteDialog
+        hideTrigger
+        mode="create"
+        open={newQuoteOpen}
+        onOpenChange={setNewQuoteOpen}
+        initialClient={
+          quoteSeedClient
+            ? {
+              name: quoteSeedClient.name,
+              organization: quoteSeedClient.organization,
+              email: quoteSeedClient.email,
+              phone: quoteSeedClient.phone,
+            }
+            : null
+        }
+      />
     </div>
   )
 }

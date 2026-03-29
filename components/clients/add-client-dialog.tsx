@@ -32,6 +32,9 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
   const [gst, setGst] = useState("")
   const [notes, setNotes] = useState("")
   const [saving, setSaving] = useState(false)
+  const [emailTouched, setEmailTouched] = useState(false)
+  const [phoneTouched, setPhoneTouched] = useState(false)
+  const [gstTouched, setGstTouched] = useState(false)
   const [selectedInterests, setSelectedInterests] = useState<string[]>(["Pharmacy Suite"])
 
   const interests = [
@@ -63,12 +66,16 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
     setPhone("")
     setGst("")
     setNotes("")
+    setEmailTouched(false)
+    setPhoneTouched(false)
+    setGstTouched(false)
     setSelectedInterests(["Pharmacy Suite"])
   }
 
   const validateEmail = (emailValue: string) => {
+    if (!emailValue.trim()) return false
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(emailValue)
+    return emailRegex.test(emailValue.trim().toLowerCase())
   }
 
   const validatePhone = (phoneValue: string) => {
@@ -80,10 +87,18 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
   const validateGST = (gstValue: string) => {
     if (!gstValue.trim()) return true
     const gstRegex = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/
-    return gstRegex.test(gstValue)
+    return gstRegex.test(gstValue.trim().toUpperCase())
   }
 
+  const isEmailInvalid = emailTouched && !validateEmail(email)
+  const isPhoneInvalid = phoneTouched && phone.trim().length > 0 && !validatePhone(phone)
+  const isGstInvalid = gstTouched && gst.trim().length > 0 && !validateGST(gst)
+
   async function saveClient() {
+    setEmailTouched(true)
+    setPhoneTouched(true)
+    setGstTouched(true)
+
     if (!name.trim() || !organization.trim() || !email.trim()) {
       toast.error("Name, organization and email are required.")
       return
@@ -202,11 +217,42 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
             <div className="form-row" style={{ marginTop: "10px" }}>
               <div className="form-group">
                 <label className="form-label">Email</label>
-                <Input className="form-input" type="email" placeholder="contact@company.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+                <Input
+                  className="form-input"
+                  type="email"
+                  placeholder="contact@company.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  onBlur={() => setEmailTouched(true)}
+                  style={{
+                    borderColor: isEmailInvalid ? "#ef4444" : undefined,
+                    backgroundColor: isEmailInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
+                  }}
+                />
+                {isEmailInvalid ? (
+                  <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
+                    Please enter a valid email address
+                  </div>
+                ) : null}
               </div>
               <div className="form-group">
                 <label className="form-label">Phone</label>
-                <Input className="form-input" placeholder="+91 98xxx xxxxx" value={phone} onChange={(event) => setPhone(event.target.value)} />
+                <Input
+                  className="form-input"
+                  placeholder="+91 98xxx xxxxx"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  onBlur={() => setPhoneTouched(true)}
+                  style={{
+                    borderColor: isPhoneInvalid ? "#ef4444" : undefined,
+                    backgroundColor: isPhoneInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
+                  }}
+                />
+                {isPhoneInvalid ? (
+                  <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
+                    Please enter a valid phone number (minimum 10 digits)
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -235,7 +281,24 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
               </div>
               <div className="form-group">
                 <label className="form-label">GST number</label>
-                <Input className="form-input" placeholder="29AAAAA0000A1Z5" style={{ fontFamily: "var(--mono)", fontSize: "12px" }} value={gst} onChange={(event) => setGst(event.target.value)} />
+                <Input
+                  className="form-input"
+                  placeholder="29AAAAA0000A1Z5"
+                  style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: "12px",
+                    borderColor: isGstInvalid ? "#ef4444" : undefined,
+                    backgroundColor: isGstInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
+                  }}
+                  value={gst}
+                  onChange={(event) => setGst(event.target.value.toUpperCase())}
+                  onBlur={() => setGstTouched(true)}
+                />
+                {isGstInvalid ? (
+                  <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
+                    Please enter a valid GST number
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
