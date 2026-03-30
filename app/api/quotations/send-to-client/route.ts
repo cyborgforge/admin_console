@@ -1,6 +1,7 @@
-import { after, NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import puppeteer from "puppeteer"
+import chromium from "@sparticuz/chromium"
+import puppeteerCore from "puppeteer-core"
 import { getSupabaseServerClient } from "@/lib/supabaseServer"
 import type { Quotation } from "@/types/quotation"
 
@@ -8,6 +9,23 @@ const resendApiKey = process.env.RESEND_API_KEY
 const resendFromEmail = process.env.RESEND_FROM_EMAIL || "Resend <onboarding@resend.dev>"
 
 export const runtime = "nodejs"
+
+async function launchBrowser() {
+  if (process.env.VERCEL) {
+    return puppeteerCore.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    })
+  }
+
+  const localPuppeteer = await import("puppeteer")
+  return localPuppeteer.default.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  })
+}
 
 function generateQuotationHTML(quotation: Quotation): string {
   const lineItemsTotal = quotation.lineItems?.reduce(
@@ -253,7 +271,7 @@ function generateQuotationHTML(quotation: Quotation): string {
   `
 }
 
-async function sendQuotationInBackground(quotation: Quotation, recipientEmail: string) {
+async function sendQuotationEmail(quotation: Quotation, recipientEmail: string) {
   if (!resendApiKey) {
     throw new Error("RESEND_API_KEY is not configured")
   }
@@ -262,7 +280,7 @@ async function sendQuotationInBackground(quotation: Quotation, recipientEmail: s
 
   // Generate PDF
   const html = generateQuotationHTML(quotation)
-  const browser = await puppeteer.launch()
+  const browser = await launchBrowser()
 
   try {
     const page = await browser.newPage()
@@ -340,23 +358,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    after(async () => {
-      try {
-        await sendQuotationInBackground(quotation, recipientEmail)
-      } catch (backgroundError) {
-        console.error(
-          `Background quotation send failed for ${quotation.id} to ${recipientEmail}:`,
-          backgroundError
-        )
-      }
-    })
+    await sendQuotationEmail(quotation, recipientEmail)
 
     return NextResponse.json(
       {
         success: true,
-        message: "Quotation send started in background for " + recipientEmail,
+        message: "Quote sent to the client!",
       },
-      { status: 202 }
+      { status: 200 }
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error sending quotation"

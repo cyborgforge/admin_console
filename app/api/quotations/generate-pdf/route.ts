@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
-import puppeteer from "puppeteer"
+import chromium from "@sparticuz/chromium"
+import puppeteerCore from "puppeteer-core"
 import type { Quotation } from "@/types/quotation"
+
+export const runtime = "nodejs"
+
+async function launchBrowser() {
+  if (process.env.VERCEL) {
+    return puppeteerCore.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    })
+  }
+
+  const localPuppeteer = await import("puppeteer")
+  return localPuppeteer.default.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  })
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -283,10 +303,7 @@ export async function POST(request: NextRequest) {
     `
 
     // Launch browser and generate PDF
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    })
+    const browser = await launchBrowser()
 
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: "networkidle0" })
