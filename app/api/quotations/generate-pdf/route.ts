@@ -7,11 +7,13 @@ export const runtime = "nodejs"
 
 async function launchBrowser() {
   if (process.env.VERCEL) {
+    const executablePath = await chromium.executablePath()
+
     return puppeteerCore.launch({
-      args: chromium.args,
+      args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: true,
+      executablePath,
+      headless: chromium.headless,
     })
   }
 
@@ -23,6 +25,8 @@ async function launchBrowser() {
 }
 
 export async function POST(request: NextRequest) {
+  let browser: Awaited<ReturnType<typeof launchBrowser>> | null = null
+
   try {
     const { quotation } = await request.json() as { quotation: Quotation }
 
@@ -303,7 +307,7 @@ export async function POST(request: NextRequest) {
     `
 
     // Launch browser and generate PDF
-    const browser = await launchBrowser()
+    browser = await launchBrowser()
 
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: "networkidle0" })
@@ -319,6 +323,7 @@ export async function POST(request: NextRequest) {
     })
 
     await browser.close()
+    browser = null
     const pdfBytes = Uint8Array.from(pdfBuffer)
 
     return new NextResponse(pdfBytes, {
@@ -333,5 +338,9 @@ export async function POST(request: NextRequest) {
       { error: "Failed to generate PDF" },
       { status: 500 }
     )
+  } finally {
+    if (browser) {
+      await browser.close()
+    }
   }
 }

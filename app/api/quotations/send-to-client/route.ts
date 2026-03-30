@@ -12,11 +12,13 @@ export const runtime = "nodejs"
 
 async function launchBrowser() {
   if (process.env.VERCEL) {
+    const executablePath = await chromium.executablePath()
+
     return puppeteerCore.launch({
-      args: chromium.args,
+      args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: true,
+      executablePath,
+      headless: chromium.headless,
     })
   }
 

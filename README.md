@@ -51,6 +51,14 @@ Notes:
 - It targets the first existing user in `auth.users`.
 - It uses `on conflict (id) do nothing`, so re-running is safe.
 
+## PDF Generation
+
+This project generates PDFs on the server using headless Chromium via Puppeteer.
+
+For the full end-to-end flow and dependency breakdown, see:
+
+- `docs/pdf-generation-flow.md`
+
 ### Auth routes
 
 - `/auth/login` for email/password sign in
