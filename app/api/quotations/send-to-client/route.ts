@@ -10,16 +10,41 @@ const resendFromEmail = process.env.RESEND_FROM_EMAIL || "Resend <onboarding@res
 
 export const runtime = "nodejs"
 
+function configureServerlessLibraryPath() {
+  const libCandidates = [
+    "/tmp/al2023/lib",
+    "/tmp/al2/lib",
+    "/tmp/al2/lib64",
+    "/var/task/lib",
+  ]
+
+  const existing = process.env.LD_LIBRARY_PATH
+    ? process.env.LD_LIBRARY_PATH.split(":")
+    : []
+
+  process.env.LD_LIBRARY_PATH = [...new Set([...libCandidates, ...existing])].join(":")
+}
+
 async function launchBrowser() {
   if (process.env.VERCEL) {
+    configureServerlessLibraryPath()
     const executablePath = await chromium.executablePath()
 
-    return puppeteerCore.launch({
-      args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
-      defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: chromium.headless,
-    })
+    try {
+      return await puppeteerCore.launch({
+        args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+        defaultViewport: chromium.defaultViewport,
+        executablePath,
+        headless: chromium.headless,
+      })
+    } catch (error) {
+      console.error("Failed to launch Chromium on Vercel", {
+        executablePath,
+        ldLibraryPath: process.env.LD_LIBRARY_PATH,
+        error,
+      })
+      throw error
+    }
   }
 
   const localPuppeteer = await import("puppeteer")
@@ -288,6 +313,7 @@ async function sendQuotationEmail(quotation: Quotation, recipientEmail: string) 
     const page = await browser.newPage()
     await page.setContent(html)
     const pdf = await page.pdf({ format: "A4" })
+    const pdfBuffer = Buffer.from(pdf)
 
     // Send email with PDF attachment
     const response = await resend.emails.send({
@@ -309,7 +335,7 @@ async function sendQuotationEmail(quotation: Quotation, recipientEmail: string) 
       attachments: [
         {
           filename: `${quotation.id}.pdf`,
-          content: pdf,
+          content: pdfBuffer,
         },
       ],
     })

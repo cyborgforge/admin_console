@@ -171,7 +171,8 @@ async function sendInvoiceInBackground(invoice: InvoicePdfPayload, recipientEmai
   try {
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: "networkidle0" })
-    const pdfBuffer = await page.pdf({ format: "A4" })
+    const pdf = await page.pdf({ format: "A4" })
+    const pdfBuffer = Buffer.from(pdf)
 
     const response = await resend.emails.send({
       from: resendFromEmail,
