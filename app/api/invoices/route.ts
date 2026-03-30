@@ -114,6 +114,8 @@ function calculateTotals(lineItems: InvoiceLineItem[], discountInput: number, gs
 function mapInvoice(row: Record<string, unknown>): Invoice {
   const rawStatus = row.status
   const rawProduct = row.product
+  const lineItems = sanitizeLineItems(row.line_items)
+  const rawTaxType = row.tax_type
 
   return {
     id: readString(row.id, `INV-${Date.now()}`),
@@ -127,6 +129,13 @@ function mapInvoice(row: Record<string, unknown>): Invoice {
     status: isInvoiceStatus(rawStatus) ? rawStatus : "draft",
     due: readString(row.due, "-"),
     color: readString(row.color, "#3b82f6"),
+    gstin: readString(row.gstin),
+    email: readString(row.email),
+    gstRate: readNumber(row.gst_rate, 18),
+    taxType: rawTaxType === "cgst_sgst" ? "cgst_sgst" : "igst",
+    discount: readNumber(row.discount, 0),
+    paymentTerms: readString(row.payment_terms),
+    lineItems,
   }
 }
 
@@ -287,7 +296,7 @@ export async function GET() {
     const supabase = getSupabaseServerClient()
     const { data, error } = await supabase
       .from(INVOICES_TABLE)
-      .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color")
+      .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color, gstin, email, gst_rate, tax_type, discount, payment_terms, line_items")
       .order("created_at", { ascending: false })
 
     if (error) {
@@ -333,7 +342,7 @@ export async function POST(request: Request) {
         payment_terms: normalized.paymentTerms,
         line_items: normalized.lineItems,
       })
-      .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color")
+      .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color, gstin, email, gst_rate, tax_type, discount, payment_terms, line_items")
       .single()
 
     if (error || !data) {
@@ -375,7 +384,7 @@ export async function PATCH(request: Request) {
       .from(INVOICES_TABLE)
       .update(updateData)
       .eq("id", invoiceId)
-      .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color")
+      .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color, gstin, email, gst_rate, tax_type, discount, payment_terms, line_items")
       .single()
 
     if (error || !data) {

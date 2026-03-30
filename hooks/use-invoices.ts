@@ -34,9 +34,31 @@ function readNumber(value: unknown, fallback = 0) {
   return fallback
 }
 
+function parseLineItems(value: unknown): Invoice["lineItems"] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      const record = item as Record<string, unknown>
+      const description = readString(record.description)
+      const quantity = readNumber(record.quantity, 0)
+      const rate = readNumber(record.rate, 0)
+
+      return {
+        description,
+        quantity: Number.isFinite(quantity) ? quantity : 0,
+        rate: Number.isFinite(rate) ? rate : 0,
+      }
+    })
+    .filter((line) => line.description.length > 0 && line.quantity > 0)
+}
+
 function mapInvoice(row: Record<string, unknown>): Invoice {
   const rawStatus = row.status
   const rawProduct = row.product
+  const rawTaxType = row.tax_type
 
   return {
     id: readString(row.id, `INV-${Date.now()}`),
@@ -50,6 +72,13 @@ function mapInvoice(row: Record<string, unknown>): Invoice {
     status: isInvoiceStatus(rawStatus) ? rawStatus : "draft",
     due: readString(row.due, "-"),
     color: readString(row.color, "#3b82f6"),
+    gstin: readString(row.gstin),
+    email: readString(row.email),
+    gstRate: readNumber(row.gst_rate, 18),
+    taxType: rawTaxType === "cgst_sgst" ? "cgst_sgst" : "igst",
+    discount: readNumber(row.discount, 0),
+    paymentTerms: readString(row.payment_terms),
+    lineItems: parseLineItems(row.line_items),
   }
 }
 
@@ -65,7 +94,7 @@ export function useInvoices() {
       const supabase = getSupabaseClient()
       const { data, error: supabaseError } = await supabase
         .from(INVOICES_TABLE)
-        .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color")
+        .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color, gstin, email, gst_rate, tax_type, discount, payment_terms, line_items")
         .order("created_at", { ascending: false })
 
       if (supabaseError) {

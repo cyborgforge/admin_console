@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
@@ -19,13 +19,33 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { InvoicePDFPreview, type InvoicePreviewPayload } from "@/components/invoices/invoice-pdf-preview"
 import { QuotationPDFPreview } from "@/components/quotations/quotation-pdf-preview"
-import type { CreateInvoicePayload, InvoiceLineItem } from "@/types/invoice"
+import type { CreateInvoicePayload, Invoice, InvoiceLineItem, UpdateInvoicePayload } from "@/types/invoice"
 import type { Quotation } from "@/types/quotation"
 
-export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: string }) {
-  const [open, setOpen] = useState(false)
+type NewInvoiceDialogProps = {
+  triggerClassName?: string
+  mode?: "create" | "edit"
+  open?: boolean
+  hideTrigger?: boolean
+  invoiceToEdit?: Invoice | null
+  onOpenChange?: (open: boolean) => void
+  onSaveEdit?: (invoiceId: string, payload: Omit<UpdateInvoicePayload, "id">) => Promise<void> | void
+}
+
+export function NewInvoiceDialog({
+  triggerClassName,
+  mode = "create",
+  open,
+  hideTrigger,
+  invoiceToEdit,
+  onOpenChange,
+  onSaveEdit,
+}: NewInvoiceDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
   const [previewingQuote, setPreviewingQuote] = useState<Quotation | null>(null)
+  const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [fromQuote, setFromQuote] = useState("")
   const [client, setClient] = useState("")
   const [org, setOrg] = useState("")
@@ -37,25 +57,41 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
   const [discount, setDiscount] = useState("0")
   const [paymentTerms, setPaymentTerms] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  const [previewingPdf, setPreviewingPdf] = useState(false)
+  const [previewingInvoice, setPreviewingInvoice] = useState<InvoicePreviewPayload | null>(null)
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
     { description: "", quantity: 1, rate: 0 },
   ])
   const { quotations } = useQuotations()
 
-  type InvoicePdfPayload = {
-    id: string
-    client: string
-    org: string
-    email?: string
-    due: string
-    gstin?: string
-    gstRate: number
-    taxType: "igst" | "cgst_sgst"
-    discount: number
-    paymentTerms?: string
-    lineItems: InvoiceLineItem[]
+  const isOpen = typeof open === "boolean" ? open : internalOpen
+
+  const setSheetOpen = (nextOpen: boolean) => {
+    if (typeof open !== "boolean") {
+      setInternalOpen(nextOpen)
+    }
+    onOpenChange?.(nextOpen)
   }
+
+  const clientSearchTerm = client.trim().toLowerCase()
+  const matchedClients = useMemo(() => {
+    if (!clientSearchTerm) {
+      return [] as Quotation[]
+    }
+
+    const uniqueMatches = new Map<string, Quotation>()
+    for (const quotation of quotations) {
+      const normalizedName = quotation.client.trim().toLowerCase()
+      if (!normalizedName) {
+        continue
+      }
+
+      if (normalizedName.includes(clientSearchTerm) && !uniqueMatches.has(normalizedName)) {
+        uniqueMatches.set(normalizedName, quotation)
+      }
+    }
+
+    return Array.from(uniqueMatches.values()).slice(0, 5)
+  }, [clientSearchTerm, quotations])
 
   const computedTotal = useMemo(() => {
     const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.rate, 0)
@@ -96,9 +132,48 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     setPaymentTerms("")
     setLineItems([{ description: "", quantity: 1, rate: 0 }])
     setPreviewingQuote(null)
+    setPreviewingInvoice(null)
+    setShowClientDropdown(false)
   }
 
-  const buildInvoicePdfPayload = (invoiceId: string): InvoicePdfPayload => {
+  const toDateInputValue = (value: string) => {
+    if (!value || value === "-") {
+      return ""
+    }
+
+    const parsedDate = new Date(value)
+    if (Number.isNaN(parsedDate.getTime())) {
+      return ""
+    }
+
+    return parsedDate.toISOString().slice(0, 10)
+  }
+
+  useEffect(() => {
+    if (mode !== "edit" || !invoiceToEdit || !isOpen) {
+      return
+    }
+
+    setFromQuote(invoiceToEdit.quoteRef === "-" ? "" : invoiceToEdit.quoteRef)
+    setClient(invoiceToEdit.client)
+    setOrg(invoiceToEdit.org)
+    setGstin(invoiceToEdit.gstin ?? "")
+    setEmail(invoiceToEdit.email ?? "")
+    setDueDate(toDateInputValue(invoiceToEdit.due))
+    setGstRate(String(invoiceToEdit.gstRate ?? 18))
+    setTaxType(invoiceToEdit.taxType === "cgst_sgst" ? "cgst_sgst" : "igst")
+    setDiscount(String(invoiceToEdit.discount ?? 0))
+    setPaymentTerms(invoiceToEdit.paymentTerms ?? "")
+    setLineItems(
+      invoiceToEdit.lineItems && invoiceToEdit.lineItems.length > 0
+        ? invoiceToEdit.lineItems
+        : [{ description: "", quantity: 1, rate: 0 }],
+    )
+    setPreviewingQuote(null)
+    setShowClientDropdown(false)
+  }, [invoiceToEdit, isOpen, mode])
+
+  const buildInvoicePdfPayload = (invoiceId: string): InvoicePreviewPayload => {
     const validLineItems = lineItems.filter((item) => item.description.trim() && item.quantity > 0)
 
     return {
@@ -116,7 +191,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     }
   }
 
-  async function previewInvoicePDF() {
+  function previewInvoicePDF() {
     const validLineItems = lineItems.filter((item) => item.description.trim() && item.quantity > 0)
 
     if (!client.trim()) {
@@ -129,52 +204,8 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
       return
     }
 
-    setPreviewingPdf(true)
-
-    try {
-      const supabase = getSupabaseClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      const accessToken = session?.access_token
-      if (!accessToken) {
-        throw new Error("Please sign in before generating invoice PDF.")
-      }
-
-      const payload = buildInvoicePdfPayload(fromQuote || `INV-DRAFT-${Date.now()}`)
-
-      const response = await fetch("/api/invoices/generate-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ invoice: payload }),
-      })
-
-      if (!response.ok) {
-        const errorData = (await response.json()) as { error?: string }
-        throw new Error(errorData.error ?? "Failed to generate invoice PDF")
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const anchor = document.createElement("a")
-      anchor.href = url
-      anchor.download = `${payload.id}.pdf`
-      document.body.appendChild(anchor)
-      anchor.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(anchor)
-
-      toast.success("Invoice PDF downloaded successfully!")
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to generate invoice PDF"
-      toast.error(message)
-    } finally {
-      setPreviewingPdf(false)
-    }
+    const payload = buildInvoicePdfPayload(fromQuote || `INV-DRAFT-${Date.now()}`)
+    setPreviewingInvoice(payload)
   }
 
   const addLineItem = () => {
@@ -197,6 +228,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     setFromQuote(quoteRef)
     if (!quoteRef) {
       setOrg("")
+      setEmail("")
       return
     }
 
@@ -204,6 +236,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     if (selectedQuote) {
       setClient(selectedQuote.client)
       setOrg(selectedQuote.organization)
+      setEmail(selectedQuote.email ?? "")
       
       // Create line items from quotation line items
       if (selectedQuote.lineItems && selectedQuote.lineItems.length > 0) {
@@ -223,7 +256,7 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
     }
   }
 
-  async function createInvoice(status: "draft" | "sent") {
+  async function submitInvoice(status?: "draft" | "sent") {
     if (!client.trim()) {
       toast.error("Client name is required.")
       return
@@ -260,7 +293,56 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
 
       const accessToken = session?.access_token
       if (!accessToken) {
-        throw new Error("Please sign in before creating invoices.")
+        throw new Error(mode === "edit" ? "Please sign in before updating invoices." : "Please sign in before creating invoices.")
+      }
+
+      if (mode === "edit") {
+        if (!invoiceToEdit) {
+          throw new Error("Invoice details are missing for edit.")
+        }
+
+        const updatePayload: Omit<UpdateInvoicePayload, "id"> = {
+          client,
+          org: org || client,
+          quoteRef: fromQuote || "-",
+          product: invoiceToEdit.product ?? (taxType === "cgst_sgst" ? "clinic" : "pharmacy"),
+          due: dueDate || "-",
+          gstin,
+          email,
+          gstRate: Number(gstRate) || 18,
+          taxType: taxType === "cgst_sgst" ? "cgst_sgst" : "igst",
+          discount: Number(discount) || 0,
+          paymentTerms,
+          lineItems: validLineItems,
+        }
+
+        if (onSaveEdit) {
+          await onSaveEdit(invoiceToEdit.id, updatePayload)
+        } else {
+          const updateResponse = await fetch("/api/invoices", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ id: invoiceToEdit.id, ...updatePayload }),
+          })
+
+          if (!updateResponse.ok) {
+            const updateError = (await updateResponse.json()) as { error?: string }
+            throw new Error(updateError.error ?? "Failed to update invoice.")
+          }
+        }
+
+        window.dispatchEvent(new CustomEvent("invoice:changed"))
+        toast.success("Invoice updated successfully.")
+        setSheetOpen(false)
+        resetForm()
+        return
+      }
+
+      if (!status) {
+        throw new Error("Status is required to create invoice.")
       }
 
       const payload: CreateInvoicePayload = {
@@ -315,10 +397,10 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
 
       window.dispatchEvent(new CustomEvent("invoice:changed"))
       toast.success(status === "draft" ? "Invoice saved as draft." : "Invoice sent to client.")
-      setOpen(false)
+      setSheetOpen(false)
       resetForm()
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create invoice."
+      const message = error instanceof Error ? error.message : mode === "edit" ? "Failed to update invoice." : "Failed to create invoice."
       toast.error(message)
     } finally {
       setSubmitting(false)
@@ -336,18 +418,41 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
           onOpenChange={(open) => !open && setPreviewingQuote(null)}
         />
       )}
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button className={triggerClassName}>
-          <Plus size={13} />
-          New Invoice
-        </Button>
-      </SheetTrigger>
+      {previewingInvoice ? (
+        <InvoicePDFPreview
+          invoice={previewingInvoice}
+          open={Boolean(previewingInvoice)}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setPreviewingInvoice(null)
+            }
+          }}
+        />
+      ) : null}
+    <Sheet
+      open={isOpen}
+      onOpenChange={(nextOpen) => {
+        setSheetOpen(nextOpen)
+        if (!nextOpen) {
+          resetForm()
+        }
+      }}
+    >
+      {!hideTrigger ? (
+        <SheetTrigger asChild>
+          <Button className={triggerClassName}>
+            <Plus size={13} />
+            New Invoice
+          </Button>
+        </SheetTrigger>
+      ) : null}
       <SheetContent side="right" className="panel new-invoice-sheet" showCloseButton={false}>
         <SheetHeader className="panel-header new-invoice-header">
           <div>
-            <SheetTitle className="panel-title text-(--text)">New Invoice</SheetTitle>
-            <SheetDescription className="panel-subtitle">INV-2025-025 · Draft</SheetDescription>
+            <SheetTitle className="panel-title text-(--text)">{mode === "edit" ? "Edit Invoice" : "New Invoice"}</SheetTitle>
+            <SheetDescription className="panel-subtitle">
+              {mode === "edit" && invoiceToEdit ? `${invoiceToEdit.id} · ${invoiceToEdit.status}` : "INV-2025-025 · Draft"}
+            </SheetDescription>
           </div>
           <SheetClose asChild>
             <button type="button" className="close-btn" aria-label="Close new invoice panel" onClick={resetForm}>
@@ -420,14 +525,73 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
           <div>
             <div className="section-heading">Bill to</div>
             <div className="form-row">
-              <div className="form-group">
+              <div className="form-group" style={{ position: "relative" }}>
                 <label className="form-label">Client name</label>
-                <Input
-                  className="form-input"
-                  placeholder="e.g. Apollo Pharmacy"
-                  value={client}
-                  onChange={(e) => setClient(e.target.value)}
-                />
+                <div style={{ position: "relative" }}>
+                  <Input
+                    className="form-input"
+                    placeholder="e.g. Apollo Pharmacy"
+                    value={client}
+                    onChange={(e) => {
+                      setClient(e.target.value)
+                      setShowClientDropdown(true)
+                    }}
+                    onFocus={() => setShowClientDropdown(true)}
+                  />
+                  {showClientDropdown && client.trim().length > 0 && matchedClients.length > 0 && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        background: "#1e2229",
+                        border: "1px solid #2a3b57",
+                        borderTop: "none",
+                        borderRadius: "0 0 var(--radius-sm) var(--radius-sm)",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        zIndex: 50,
+                        boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
+                      }}
+                    >
+                      {matchedClients.map((quote) => (
+                        <button
+                          key={quote.id}
+                          type="button"
+                          onClick={() => {
+                            setClient(quote.client)
+                            setOrg(quote.organization)
+                            setEmail(quote.email ?? "")
+                            setShowClientDropdown(false)
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            textAlign: "left",
+                            background: "transparent",
+                            border: "none",
+                            borderBottom: "1px solid #2a3b57",
+                            color: "#e8eaf0",
+                            cursor: "pointer",
+                            fontSize: "13px",
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#252b32"
+                            e.currentTarget.style.color = "#3b82f6"
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent"
+                            e.currentTarget.style.color = "#e8eaf0"
+                          }}
+                        >
+                          {quote.client}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">GSTIN</label>
@@ -653,26 +817,28 @@ export function NewInvoiceDialog({ triggerClassName }: { triggerClassName?: stri
           <Button
             className="btn btn-ghost new-invoice-draft-btn"
             variant="outline"
-            onClick={() => void createInvoice("draft")}
+            onClick={() => void submitInvoice(mode === "edit" ? undefined : "draft")}
             disabled={submitting}
           >
-            {submitting ? "Saving..." : "Save draft"}
+            {submitting ? "Saving..." : mode === "edit" ? "Save changes" : "Save draft"}
           </Button>
           <Button
             className="btn btn-ghost new-invoice-preview-btn"
             variant="outline"
-            onClick={() => void previewInvoicePDF()}
-            disabled={submitting || previewingPdf}
-          >
-            {previewingPdf ? "Generating..." : "Preview PDF"}
-          </Button>
-          <Button
-            className="btn btn-primary new-invoice-send-btn"
-            onClick={() => void createInvoice("sent")}
+            onClick={previewInvoicePDF}
             disabled={submitting}
           >
-            {submitting ? "Sending..." : "Send to client →"}
+            Preview PDF
           </Button>
+          {mode === "create" ? (
+            <Button
+              className="btn btn-primary new-invoice-send-btn"
+              onClick={() => void submitInvoice("sent")}
+              disabled={submitting}
+            >
+              {submitting ? "Sending..." : "Send to client →"}
+            </Button>
+          ) : null}
         </SheetFooter>
       </SheetContent>
     </Sheet>

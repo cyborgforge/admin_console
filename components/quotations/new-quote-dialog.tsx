@@ -200,6 +200,28 @@ export function NewQuoteDialog({
   const [emailTouched, setEmailTouched] = useState(false)
   const [phoneTouched, setPhoneTouched] = useState(false)
 
+  const clientSearchTerm = client.trim().toLowerCase()
+  const matchedClients = useMemo(() => {
+    if (!clientSearchTerm) {
+      return [] as Quotation[]
+    }
+
+    const uniqueMatches = new Map<string, Quotation>()
+
+    for (const quotation of quotations) {
+      const normalizedName = quotation.client.trim().toLowerCase()
+      if (!normalizedName) {
+        continue
+      }
+
+      if (normalizedName.includes(clientSearchTerm) && !uniqueMatches.has(normalizedName)) {
+        uniqueMatches.set(normalizedName, quotation)
+      }
+    }
+
+    return Array.from(uniqueMatches.values()).slice(0, 5)
+  }, [clientSearchTerm, quotations])
+
   const isOpen = typeof open === "boolean" ? open : internalOpen
 
   const setSheetOpen = (nextOpen: boolean) => {
@@ -444,6 +466,11 @@ export function NewQuoteDialog({
       return
     }
 
+    if (status === "sent" && !email.trim()) {
+      setError("Client email is required to send quotation.")
+      return
+    }
+
     setSubmitting(true)
 
     try {
@@ -531,6 +558,29 @@ export function NewQuoteDialog({
         throw new Error(responseData.error ?? "Failed to create quotation.")
       }
 
+      const createResponse = (await response.json()) as { quotation?: Quotation }
+
+      if (status === "sent") {
+        const createdQuotation = createResponse.quotation
+        if (!createdQuotation) {
+          throw new Error("Quotation created but failed to prepare email payload.")
+        }
+
+        const sendResponse = await fetch("/api/quotations/send-to-client", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ quotation: createdQuotation }),
+        })
+
+        if (!sendResponse.ok) {
+          const sendError = (await sendResponse.json()) as { error?: string }
+          throw new Error(sendError.error ?? "Quotation created but failed to send email.")
+        }
+      }
+
       window.dispatchEvent(new CustomEvent("quotation:changed"))
       toast.success(status === "draft" ? "Quotation saved as draft." : "Quotation sent to client.")
       setSheetOpen(false)
@@ -603,7 +653,7 @@ export function NewQuoteDialog({
                     }}
                     onFocus={() => setShowClientDropdown(true)}
                   />
-                  {showClientDropdown && client.length > 0 && (
+                  {showClientDropdown && client.trim().length > 0 && matchedClients.length > 0 && (
                     <div
                       style={{
                         position: "absolute",
@@ -620,10 +670,7 @@ export function NewQuoteDialog({
                         boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
                       }}
                     >
-                      {quotations
-                        .filter((q) => q.client.toLowerCase().includes(client.toLowerCase()))
-                        .slice(0, 5)
-                        .map((quote) => (
+                      {matchedClients.map((quote) => (
                           <button
                             key={quote.id}
                             type="button"
@@ -656,11 +703,6 @@ export function NewQuoteDialog({
                             {quote.client}
                           </button>
                         ))}
-                      {quotations.filter((q) => q.client.toLowerCase().includes(client.toLowerCase())).length === 0 && (
-                        <div style={{ padding: "10px 12px", color: "#4f5a6a", fontSize: "12px", textAlign: "center", fontStyle: "italic" }}>
-                          No matching clients
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>

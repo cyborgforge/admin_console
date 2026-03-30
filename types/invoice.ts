@@ -20,6 +20,13 @@ export type Invoice = {
   status: InvoiceStatus
   due: string
   color: string
+  gstin?: string
+  email?: string
+  gstRate?: number
+  taxType?: "igst" | "cgst_sgst"
+  discount?: number
+  paymentTerms?: string
+  lineItems?: InvoiceLineItem[]
 }
 
 export type CreateInvoicePayload = {

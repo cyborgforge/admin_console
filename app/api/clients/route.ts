@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { getSupabaseServerClient } from "@/lib/supabaseServer"
-import type { Client, ClientStatus, CreateClientPayload } from "@/types/client"
+import type { Client, ClientStatus, CreateClientPayload, UpdateClientPayload } from "@/types/client"
 
 const CLIENTS_TABLE = process.env.SUPABASE_CLIENTS_TABLE ?? "clients"
 
@@ -126,6 +126,87 @@ function normalizeCreatePayload(payload: Partial<CreateClientPayload>) {
   }
 }
 
+function buildUpdateData(payload: UpdateClientPayload) {
+  const updateData: Record<string, unknown> = {}
+
+  if (typeof payload.name === "string") {
+    const value = payload.name.trim()
+    if (value) {
+      updateData.name = value
+    }
+  }
+
+  if (typeof payload.role === "string") {
+    const value = payload.role.trim()
+    if (value) {
+      updateData.role = value
+    }
+  }
+
+  if (typeof payload.organization === "string") {
+    const value = payload.organization.trim()
+    if (value) {
+      updateData.organization = value
+    }
+  }
+
+  if (typeof payload.industry === "string") {
+    const value = payload.industry.trim()
+    if (value) {
+      updateData.industry = value
+    }
+  }
+
+  if (typeof payload.city === "string") {
+    const value = payload.city.trim()
+    if (value) {
+      updateData.city = value
+    }
+  }
+
+  if (typeof payload.email === "string") {
+    const value = payload.email.trim()
+    if (value) {
+      updateData.email = value
+    }
+  }
+
+  if (typeof payload.phone === "string") {
+    const value = payload.phone.trim()
+    if (value) {
+      updateData.phone = value
+    }
+  }
+
+  if (payload.status && isClientStatus(payload.status)) {
+    updateData.status = payload.status
+  }
+
+  if (typeof payload.product === "string") {
+    const value = payload.product.trim()
+    if (value) {
+      updateData.product = value
+    }
+  }
+
+  if (typeof payload.color === "string") {
+    const value = payload.color.trim()
+    if (value) {
+      updateData.color = value
+    }
+  }
+
+  if (typeof payload.gst === "string") {
+    updateData.gst = payload.gst.trim() || "-"
+  }
+
+  if (typeof payload.notes === "string") {
+    updateData.notes = payload.notes.trim()
+  }
+
+  return updateData
+}
+
 export async function GET(request: Request) {
   try {
     const authContext = await getSupabaseForWrite(request)
@@ -189,6 +270,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ client: mapClient(data as Record<string, unknown>) }, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create client."
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const writeContext = await getSupabaseForWrite(request)
+    if (writeContext.error || !writeContext.supabase) {
+      return writeContext.error!
+    }
+
+    const body = (await request.json()) as UpdateClientPayload
+    const clientId = readString(body.id)
+
+    if (!clientId) {
+      return NextResponse.json({ error: "id is required." }, { status: 400 })
+    }
+
+    const updateData = buildUpdateData(body)
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "No updatable fields were provided." }, { status: 400 })
+    }
+
+    const { data, error } = await writeContext.supabase
+      .from(CLIENTS_TABLE)
+      .update(updateData)
+      .eq("id", clientId)
+      .select("*")
+      .single()
+
+    if (error || !data) {
+      return NextResponse.json({ error: error?.message ?? "Failed to update client." }, { status: 400 })
+    }
+
+    return NextResponse.json({ client: mapClient(data as Record<string, unknown>) })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update client."
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

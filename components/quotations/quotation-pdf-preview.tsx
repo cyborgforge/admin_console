@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { X, Copy, Download, Send } from "lucide-react"
+import { X, Download, Send } from "lucide-react"
 import { toast } from "sonner"
 
 import { getSupabaseClient } from "@/lib/supabaseClient"
@@ -30,7 +30,6 @@ export function QuotationPDFPreview({
 }: QuotationPDFPreviewProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSending, setIsSending] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [resolvedContact, setResolvedContact] = useState<{ email?: string; phone?: string } | null>(null)
   const fmt = (n: number) => "₹" + n.toLocaleString("en-IN")
 
@@ -170,14 +169,6 @@ export function QuotationPDFPreview({
       setIsGenerating(false)
     }
   }, [quotation])
-
-  const copyShareLink = () => {
-    const shareLink = `${window.location.origin}/quotations/${quotation.id}`
-    navigator.clipboard.writeText(shareLink)
-    setCopied(true)
-    toast.success("Link copied to clipboard!")
-    setTimeout(() => setCopied(false), 2000)
-  }
 
   const sendToClient = useCallback(async () => {
     if (!quotation.email) {
@@ -379,16 +370,6 @@ export function QuotationPDFPreview({
             width: "100%",
           }}
         >
-          <Button
-            type="button"
-            className="btn btn-ghost"
-            variant="outline"
-            onClick={copyShareLink}
-            style={{ flex: 1, padding: "7px 14px", fontSize: "13px", color: "#8B95A8", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
-          >
-            <Copy size={16} />
-            {copied ? "Copied" : "Copy share link"}
-          </Button>
           <Button
             type="button"
             className="btn btn-ghost"

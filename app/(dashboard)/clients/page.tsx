@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { LayoutGrid, Rows3, X } from "lucide-react"
 import { useRef } from "react"
 
+import { AddClientDialog } from "@/components/clients/add-client-dialog"
 import { ClientCard } from "@/components/clients/client-card"
 import { ClientTable } from "@/components/clients/client-table"
 import { NewQuoteDialog } from "@/components/quotations/new-quote-dialog"
@@ -55,6 +56,8 @@ export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [newQuoteOpen, setNewQuoteOpen] = useState(false)
   const [quoteSeedClient, setQuoteSeedClient] = useState<Client | null>(null)
+  const [editClientOpen, setEditClientOpen] = useState(false)
+  const [clientToEdit, setClientToEdit] = useState<Client | null>(null)
   const optimisticClientIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
@@ -311,6 +314,25 @@ export default function ClientsPage() {
                 </SheetClose>
                 <Button
                   variant="outline"
+                  className="btn btn-ghost"
+                  style={{
+                    background: "transparent",
+                    borderColor: "#2a3b57",
+                    color: "#f59e0b",
+                  }}
+                  onClick={() => {
+                    if (!selectedClient) {
+                      return
+                    }
+                    setClientToEdit(selectedClient)
+                    setSelectedClient(null)
+                    setEditClientOpen(true)
+                  }}
+                >
+                  Edit client
+                </Button>
+                <Button
+                  variant="outline"
                   className="btn btn-primary"
                   onClick={() => {
                     if (!selectedClient) {
@@ -344,6 +366,14 @@ export default function ClientsPage() {
             }
             : null
         }
+      />
+
+      <AddClientDialog
+        hideTrigger
+        mode="edit"
+        open={editClientOpen}
+        onOpenChange={setEditClientOpen}
+        clientToEdit={clientToEdit}
       />
     </div>
   )

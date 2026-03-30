@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
@@ -20,8 +20,24 @@ import {
 } from "@/components/ui/sheet"
 import type { Client } from "@/types/client"
 
-export function AddClientDialog({ triggerClassName }: { triggerClassName?: string }) {
-  const [open, setOpen] = useState(false)
+type AddClientDialogProps = {
+  triggerClassName?: string
+  mode?: "create" | "edit"
+  open?: boolean
+  hideTrigger?: boolean
+  clientToEdit?: Client | null
+  onOpenChange?: (open: boolean) => void
+}
+
+export function AddClientDialog({
+  triggerClassName,
+  mode = "create",
+  open,
+  hideTrigger,
+  clientToEdit,
+  onOpenChange,
+}: AddClientDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
   const [name, setName] = useState("")
   const [role, setRole] = useState("")
   const [organization, setOrganization] = useState("")
@@ -36,6 +52,15 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
   const [phoneTouched, setPhoneTouched] = useState(false)
   const [gstTouched, setGstTouched] = useState(false)
   const [selectedInterests, setSelectedInterests] = useState<string[]>(["Pharmacy Suite"])
+
+  const isOpen = typeof open === "boolean" ? open : internalOpen
+
+  const setSheetOpen = (nextOpen: boolean) => {
+    if (typeof open !== "boolean") {
+      setInternalOpen(nextOpen)
+    }
+    onOpenChange?.(nextOpen)
+  }
 
   const interests = [
     "Pharmacy Suite",
@@ -71,6 +96,26 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
     setGstTouched(false)
     setSelectedInterests(["Pharmacy Suite"])
   }
+
+  useEffect(() => {
+    if (mode !== "edit" || !clientToEdit || !isOpen) {
+      return
+    }
+
+    setName(clientToEdit.name)
+    setRole(clientToEdit.role)
+    setOrganization(clientToEdit.organization)
+    setIndustry(clientToEdit.industry)
+    setCity(clientToEdit.city)
+    setEmail(clientToEdit.email)
+    setPhone(clientToEdit.phone)
+    setGst(clientToEdit.gst === "-" ? "" : clientToEdit.gst)
+    setNotes(clientToEdit.notes ?? "")
+    setSelectedInterests([clientToEdit.product || "Pharmacy Suite"])
+    setEmailTouched(false)
+    setPhoneTouched(false)
+    setGstTouched(false)
+  }, [clientToEdit, isOpen, mode])
 
   const validateEmail = (emailValue: string) => {
     if (!emailValue.trim()) return false
@@ -129,6 +174,7 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
       const token = session?.access_token
 
       const payload = {
+        ...(mode === "edit" && clientToEdit ? { id: clientToEdit.id } : {}),
         name: name.trim(),
         role: role.trim() || "Owner",
         organization: organization.trim(),
@@ -137,7 +183,7 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
         email: email.trim(),
         phone: phone.trim() || "+91 90000 00000",
         product: selectedInterests[0] || "Pharmacy Suite",
-        status: "prospect",
+        ...(mode === "create" ? { status: "prospect" as const } : {}),
         gst: gst.trim() || "-",
         notes: [notes.trim(), selectedInterests.length ? `Interests: ${selectedInterests.join(", ")}` : ""]
           .filter(Boolean)
@@ -145,7 +191,7 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
       }
 
       const response = await fetch("/api/clients", {
-        method: "POST",
+        method: mode === "edit" ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -155,7 +201,7 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
 
       if (!response.ok) {
         const responseData = (await response.json()) as { error?: string }
-        throw new Error(responseData.error ?? "Failed to create client.")
+        throw new Error(responseData.error ?? (mode === "edit" ? "Failed to update client." : "Failed to create client."))
       }
 
       const responseData = (await response.json()) as {
@@ -169,11 +215,11 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
           },
         }),
       )
-      toast.success("Client added successfully.")
-      setOpen(false)
+      toast.success(mode === "edit" ? "Client updated successfully." : "Client added successfully.")
+      setSheetOpen(false)
       resetForm()
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create client."
+      const message = error instanceof Error ? error.message : mode === "edit" ? "Failed to update client." : "Failed to create client."
       toast.error(message)
     } finally {
       setSaving(false)
@@ -181,18 +227,30 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button className={triggerClassName}>
-          <Plus size={13} />
-          Add Client
-        </Button>
-      </SheetTrigger>
+    <Sheet
+      open={isOpen}
+      onOpenChange={(nextOpen) => {
+        setSheetOpen(nextOpen)
+        if (!nextOpen) {
+          resetForm()
+        }
+      }}
+    >
+      {!hideTrigger ? (
+        <SheetTrigger asChild>
+          <Button className={triggerClassName}>
+            <Plus size={13} />
+            Add Client
+          </Button>
+        </SheetTrigger>
+      ) : null}
       <SheetContent side="right" className="panel add-client-sheet" showCloseButton={false}>
         <SheetHeader className="panel-header add-client-header">
           <div>
-            <SheetTitle className="panel-title text-(--text)">Add new client</SheetTitle>
-            <SheetDescription className="panel-subtitle">Fill in the client details below</SheetDescription>
+            <SheetTitle className="panel-title text-(--text)">{mode === "edit" ? "Edit client" : "Add new client"}</SheetTitle>
+            <SheetDescription className="panel-subtitle">
+              {mode === "edit" ? "Update the client details below" : "Fill in the client details below"}
+            </SheetDescription>
           </div>
           <SheetClose asChild>
             <button type="button" className="close-btn" aria-label="Close add client panel" onClick={resetForm}>
@@ -329,7 +387,9 @@ export function AddClientDialog({ triggerClassName }: { triggerClassName?: strin
           <SheetClose asChild>
             <Button type="button" className="btn btn-ghost" variant="outline" onClick={resetForm} disabled={saving}>Cancel</Button>
           </SheetClose>
-          <Button type="button" className="btn btn-primary add-client-save" onClick={() => void saveClient()} disabled={saving}>{saving ? "Saving..." : "Save client"}</Button>
+          <Button type="button" className="btn btn-primary add-client-save" onClick={() => void saveClient()} disabled={saving}>
+            {saving ? "Saving..." : mode === "edit" ? "Save changes" : "Save client"}
+          </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

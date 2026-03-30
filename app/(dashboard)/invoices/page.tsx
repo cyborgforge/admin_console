@@ -1,9 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Search } from "lucide-react"
+import { Eye, Pencil, Search } from "lucide-react"
+
+import { InvoicePDFPreview, type InvoicePreviewPayload } from "@/components/invoices/invoice-pdf-preview"
+import { NewInvoiceDialog } from "@/components/invoices/new-invoice-dialog"
 import { useInvoices } from "@/hooks/use-invoices"
-import type { Invoice, InvoiceStatus } from "@/types/invoice"
+import type { Invoice, InvoiceLineItem, InvoiceStatus, UpdateInvoicePayload } from "@/types/invoice"
 
 const statusClassName: Record<InvoiceStatus, string> = {
   draft: "badge-draft",
@@ -39,11 +42,40 @@ const getInitials = (name: string) =>
     .toUpperCase()
 
 export default function InvoicesPage() {
-  const { invoices, loading, error } = useInvoices()
+  const { invoices, loading, error, updateInvoice } = useInvoices()
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<"all" | InvoiceStatus>("all")
   const [product, setProduct] = useState<"all" | Invoice["product"]>("all")
   const [period, setPeriod] = useState("all")
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
+  const [previewingInvoice, setPreviewingInvoice] = useState<InvoicePreviewPayload | null>(null)
+
+  const buildPreviewPayload = (invoice: Invoice): InvoicePreviewPayload => {
+    const invoiceLineItems: InvoiceLineItem[] = invoice.lineItems ?? []
+    const fallbackRate = invoice.amount > 0 ? invoice.amount : invoice.total
+    const lineItems = invoiceLineItems.length > 0
+      ? invoiceLineItems
+      : [{ description: invoice.quoteRef !== "-" ? `Invoice from ${invoice.quoteRef}` : invoice.product, quantity: 1, rate: fallbackRate }]
+
+    return {
+      id: invoice.id,
+      client: invoice.client,
+      org: invoice.org,
+      email: invoice.email,
+      due: invoice.due,
+      gstin: invoice.gstin,
+      gstRate: invoice.gstRate ?? 18,
+      taxType: invoice.taxType === "cgst_sgst" ? "cgst_sgst" : "igst",
+      discount: invoice.discount ?? 0,
+      paymentTerms: invoice.paymentTerms,
+      lineItems,
+    }
+  }
+
+  const handleSaveEdit = async (invoiceId: string, payload: Omit<UpdateInvoicePayload, "id">) => {
+    await updateInvoice({ id: invoiceId, ...payload })
+    window.dispatchEvent(new CustomEvent("invoice:changed"))
+  }
 
   const counts = useMemo(() => {
     return {
@@ -83,6 +115,18 @@ export default function InvoicesPage() {
 
   return (
     <div className="content" id="section-invoices">
+      {previewingInvoice ? (
+        <InvoicePDFPreview
+          invoice={previewingInvoice}
+          open={Boolean(previewingInvoice)}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setPreviewingInvoice(null)
+            }
+          }}
+        />
+      ) : null}
+
       <div className="stats">
         <div className="stat-card">
           <div className="stat-label">Total Invoiced</div>
@@ -152,12 +196,13 @@ export default function InvoicesPage() {
               <th>Total</th>
               <th>Status</th>
               <th>Due Date</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {filteredInvoices.length === 0 ? (
               <tr>
-                <td colSpan={8} className="empty">
+                <td colSpan={9} className="empty">
                   <div className="empty-icon">🧾</div>
                   <div className="empty-text">No invoices found</div>
                 </td>
@@ -185,12 +230,47 @@ export default function InvoicesPage() {
                     <span className={`badge ${statusClassName[invoice.status]}`}>{statusLabel[invoice.status]}</span>
                   </td>
                   <td className="quote-id">{invoice.due}</td>
+                  <td>
+                    <div className="row-actions">
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => setPreviewingInvoice(buildPreviewPayload(invoice))}
+                        title="Preview invoice"
+                        aria-label="Preview invoice"
+                      >
+                        <Eye size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => setEditingInvoice(invoice)}
+                        title="Edit invoice"
+                        aria-label="Edit invoice"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      <NewInvoiceDialog
+        hideTrigger
+        mode="edit"
+        open={Boolean(editingInvoice)}
+        invoiceToEdit={editingInvoice}
+        onOpenChange={(openValue) => {
+          if (!openValue) {
+            setEditingInvoice(null)
+          }
+        }}
+        onSaveEdit={handleSaveEdit}
+      />
     </div>
   )
 }

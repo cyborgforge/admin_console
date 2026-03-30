@@ -33,3 +33,19 @@ export type CreateClientPayload = {
   gst?: string
   notes?: string
 }
+
+export type UpdateClientPayload = {
+  id: string
+  name?: string
+  role?: string
+  organization?: string
+  industry?: string
+  city?: string
+  email?: string
+  phone?: string
+  status?: ClientStatus
+  product?: string
+  color?: string
+  gst?: string
+  notes?: string
+}
