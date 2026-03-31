@@ -44,7 +44,7 @@ function configureServerlessLibraryPath() {
 async function launchBrowser() {
   if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
     configureServerlessLibraryPath()
-    const executablePath = await chromium.executablePath("https://github.com/Sparticuz/chromium/releases/download/v138.0.1/chromium-v138.0.1-pack.tar")
+    const executablePath = await chromium.executablePath("https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.arm64.tar")
 
     return puppeteerCore.launch({
       executablePath,
