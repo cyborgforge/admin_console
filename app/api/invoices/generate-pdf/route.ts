@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import chromium from "@sparticuz/chromium-min"
-import puppeteerCore from "puppeteer-core"
+import puppeteer from "puppeteer"
 
 type InvoicePdfLineItem = {
   description: string
@@ -25,41 +24,6 @@ type InvoicePdfPayload = {
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
-
-function configureServerlessLibraryPath() {
-  const libCandidates = [
-    "/tmp/al2023/lib",
-    "/tmp/al2/lib",
-    "/tmp/al2/lib64",
-    "/var/task/lib",
-  ]
-
-  const existing = process.env.LD_LIBRARY_PATH
-    ? process.env.LD_LIBRARY_PATH.split(":")
-    : []
-
-  process.env.LD_LIBRARY_PATH = [...new Set([...libCandidates, ...existing])].join(":")
-}
-
-async function launchBrowser() {
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-    configureServerlessLibraryPath()
-    const executablePath = await chromium.executablePath("https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.arm64.tar")
-
-    return puppeteerCore.launch({
-      executablePath,
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      headless: chromium.headless,
-    })
-  }
-
-  const localPuppeteer = await import("puppeteer")
-  return localPuppeteer.default.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  })
-}
 
 function generateInvoiceHTML(invoice: InvoicePdfPayload): string {
   const subtotal = invoice.lineItems.reduce((sum, item) => sum + item.quantity * item.rate, 0)
@@ -276,7 +240,7 @@ function generateInvoiceHTML(invoice: InvoicePdfPayload): string {
 }
 
 export async function POST(request: NextRequest) {
-  let browser: Awaited<ReturnType<typeof launchBrowser>> | null = null
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
 
   try {
     const { invoice } = (await request.json()) as { invoice: InvoicePdfPayload }
@@ -287,7 +251,10 @@ export async function POST(request: NextRequest) {
 
     const html = generateInvoiceHTML(invoice)
 
-    browser = await launchBrowser()
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    })
 
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: "networkidle0" })

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import chromium from "@sparticuz/chromium-min"
-import puppeteerCore from "puppeteer-core"
+import puppeteer from "puppeteer"
 import { getSupabaseServerClient } from "@/lib/supabaseServer"
 import type { Quotation } from "@/types/quotation"
 
@@ -11,50 +10,6 @@ const resendFromEmail = process.env.RESEND_FROM_EMAIL || "Resend <onboarding@res
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
-
-function configureServerlessLibraryPath() {
-  const libCandidates = [
-    "/tmp/al2023/lib",
-    "/tmp/al2/lib",
-    "/tmp/al2/lib64",
-    "/var/task/lib",
-  ]
-
-  const existing = process.env.LD_LIBRARY_PATH
-    ? process.env.LD_LIBRARY_PATH.split(":")
-    : []
-
-  process.env.LD_LIBRARY_PATH = [...new Set([...libCandidates, ...existing])].join(":")
-}
-
-async function launchBrowser() {
-  if (process.env.VERCEL) {
-    configureServerlessLibraryPath()
-    const executablePath = await chromium.executablePath("https://github.com/Sparticuz/chromium/releases/download/v138.0.1/chromium-v138.0.1-pack.tar")
-
-    try {
-      return await puppeteerCore.launch({
-        args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
-        defaultViewport: chromium.defaultViewport,
-        executablePath,
-        headless: chromium.headless,
-      })
-    } catch (error) {
-      console.error("Failed to launch Chromium on Vercel", {
-        executablePath,
-        ldLibraryPath: process.env.LD_LIBRARY_PATH,
-        error,
-      })
-      throw error
-    }
-  }
-
-  const localPuppeteer = await import("puppeteer")
-  return localPuppeteer.default.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  })
-}
 
 function generateQuotationHTML(quotation: Quotation): string {
   const lineItemsTotal = quotation.lineItems?.reduce(
@@ -309,7 +264,10 @@ async function sendQuotationEmail(quotation: Quotation, recipientEmail: string) 
 
   // Generate PDF
   const html = generateQuotationHTML(quotation)
-  const browser = await launchBrowser()
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  })
 
   try {
     const page = await browser.newPage()

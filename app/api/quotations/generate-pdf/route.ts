@@ -1,58 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import chromium from "@sparticuz/chromium-min"
-import puppeteerCore from "puppeteer-core"
+import puppeteer from "puppeteer"
 import type { Quotation } from "@/types/quotation"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
-function configureServerlessLibraryPath() {
-  const libCandidates = [
-    "/tmp/al2023/lib",
-    "/tmp/al2/lib",
-    "/tmp/al2/lib64",
-    "/var/task/lib",
-  ]
-
-  const existing = process.env.LD_LIBRARY_PATH
-    ? process.env.LD_LIBRARY_PATH.split(":")
-    : []
-
-  process.env.LD_LIBRARY_PATH = [...new Set([...libCandidates, ...existing])].join(":")
-}
-
-async function launchBrowser() {
-  if (process.env.VERCEL) {
-    configureServerlessLibraryPath()
-    const executablePath = await chromium.executablePath("https://github.com/Sparticuz/chromium/releases/download/v138.0.1/chromium-v138.0.1-pack.tar")
-
-    try {
-      return await puppeteerCore.launch({
-        args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
-        defaultViewport: chromium.defaultViewport,
-        executablePath,
-        headless: chromium.headless,
-      })
-    } catch (error) {
-      console.error("Failed to launch Chromium on Vercel", {
-        executablePath,
-        ldLibraryPath: process.env.LD_LIBRARY_PATH,
-        error,
-      })
-      throw error
-    }
-  }
-
-  const localPuppeteer = await import("puppeteer")
-  return localPuppeteer.default.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  })
-}
-
 export async function POST(request: NextRequest) {
-  let browser: Awaited<ReturnType<typeof launchBrowser>> | null = null
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
 
   try {
     const { quotation } = await request.json() as { quotation: Quotation }
@@ -334,7 +289,10 @@ export async function POST(request: NextRequest) {
     `
 
     // Launch browser and generate PDF
-    browser = await launchBrowser()
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    })
 
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: "networkidle0" })

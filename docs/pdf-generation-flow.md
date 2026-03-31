@@ -22,39 +22,13 @@ Role:
 Used in:
 - app/api/invoices/generate-pdf/route.ts
 - app/api/invoices/send-to-client/route.ts
-- app/api/quotations/generate-pdf/route.ts (local branch via dynamic import)
-- app/api/quotations/send-to-client/route.ts (local branch via dynamic import)
-
-Why it exists:
-- It bundles a Chromium path suitable for local development and non-serverless runtime.
-
-### 2) puppeteer-core
-
-Role:
-- Provides Puppeteer control APIs without downloading full Chromium.
-- Works with an externally provided browser executable.
-
-Used in:
 - app/api/quotations/generate-pdf/route.ts
 - app/api/quotations/send-to-client/route.ts
 
 Why it exists:
-- Useful in serverless deployment where the Chromium binary comes from a dedicated package.
+- It provides the browser engine used by all PDF routes.
 
-### 3) @sparticuz/chromium
-
-Role:
-- Provides a serverless-compatible Chromium binary and recommended launch arguments.
-- Supplies executable path and defaults for Vercel environments.
-
-Used in:
-- app/api/quotations/generate-pdf/route.ts
-- app/api/quotations/send-to-client/route.ts
-
-Why it exists:
-- Standard Puppeteer browser binaries are often too heavy or incompatible in serverless runtimes.
-
-### 4) resend
+### 2) resend
 
 Role:
 - Sends emails with generated PDF attachments.
@@ -66,7 +40,7 @@ Used in:
 Why it exists:
 - Handles outbound transactional email delivery for quotations and invoices.
 
-### 5) next/server (NextRequest, NextResponse, after)
+### 3) next/server (NextRequest, NextResponse, after)
 
 Role:
 - Defines server route handlers and HTTP responses.
@@ -85,17 +59,9 @@ All PDF routes are Node runtime routes (`runtime = "nodejs"`).
 
 Environment behavior:
 
-- If running on Vercel:
-  - Quotation routes use puppeteer-core + @sparticuz/chromium.
-  - Browser launch uses:
-    - chromium.args
-    - chromium.defaultViewport
-    - executablePath from chromium.executablePath()
-
-- If running locally:
-  - Routes launch with puppeteer and sandbox-disabled args:
-    - --no-sandbox
-    - --disable-setuid-sandbox
+- All routes launch with puppeteer and sandbox-disabled args:
+   - --no-sandbox
+   - --disable-setuid-sandbox
 
 ## End-to-End Flows
 
@@ -149,7 +115,7 @@ Step-by-step:
    - quotation payload exists.
    - recipient email exists (quotation.email).
 3. Route generates quotation HTML.
-4. Route launches browser (Vercel or local strategy).
+4. Route launches browser with Puppeteer.
 5. Route renders PDF buffer from HTML.
 6. Route sends email using Resend:
    - subject includes quotation ID
