@@ -1,6 +1,7 @@
 import { after, NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import puppeteer from "puppeteer"
+import chromium from "@sparticuz/chromium-min"
+import puppeteerCore from "puppeteer-core"
 
 type InvoicePdfLineItem = {
   description: string
@@ -26,6 +27,43 @@ const resendApiKey = process.env.RESEND_API_KEY
 const resendFromEmail = process.env.RESEND_FROM_EMAIL || "Resend <onboarding@resend.dev>"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+export const maxDuration = 60
+
+function configureServerlessLibraryPath() {
+  const libCandidates = [
+    "/tmp/al2023/lib",
+    "/tmp/al2/lib",
+    "/tmp/al2/lib64",
+    "/var/task/lib",
+  ]
+
+  const existing = process.env.LD_LIBRARY_PATH
+    ? process.env.LD_LIBRARY_PATH.split(":")
+    : []
+
+  process.env.LD_LIBRARY_PATH = [...new Set([...libCandidates, ...existing])].join(":")
+}
+
+async function launchBrowser() {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    configureServerlessLibraryPath()
+    const executablePath = await chromium.executablePath("https://github.com/Sparticuz/chromium/releases/download/v138.0.1/chromium-v138.0.1-pack.tar")
+
+    return puppeteerCore.launch({
+      executablePath,
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      headless: chromium.headless,
+    })
+  }
+
+  const localPuppeteer = await import("puppeteer")
+  return localPuppeteer.default.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  })
+}
 
 function generateInvoiceHTML(invoice: InvoicePdfPayload): string {
   const subtotal = invoice.lineItems.reduce((sum, item) => sum + item.quantity * item.rate, 0)
@@ -163,10 +201,7 @@ async function sendInvoiceInBackground(invoice: InvoicePdfPayload, recipientEmai
   const resend = new Resend(resendApiKey)
   const html = generateInvoiceHTML(invoice)
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  })
+  const browser = await launchBrowser()
 
   try {
     const page = await browser.newPage()

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import chromium from "@sparticuz/chromium"
+import chromium from "@sparticuz/chromium-min"
 import puppeteerCore from "puppeteer-core"
 import type { Quotation } from "@/types/quotation"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+export const maxDuration = 60
 
 function configureServerlessLibraryPath() {
   const libCandidates = [
@@ -23,7 +25,7 @@ function configureServerlessLibraryPath() {
 async function launchBrowser() {
   if (process.env.VERCEL) {
     configureServerlessLibraryPath()
-    const executablePath = await chromium.executablePath()
+    const executablePath = await chromium.executablePath("https://github.com/Sparticuz/chromium/releases/download/v138.0.1/chromium-v138.0.1-pack.tar")
 
     try {
       return await puppeteerCore.launch({
