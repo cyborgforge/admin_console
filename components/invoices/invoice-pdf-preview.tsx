@@ -1,12 +1,17 @@
 "use client"
 
-import { X } from "lucide-react"
+import { useCallback, useState } from "react"
+import { X, Download, Send } from "lucide-react"
+import { toast } from "sonner"
 
+import { getSupabaseClient } from "@/lib/supabaseClient"
+import { Button } from "@/components/ui/button"
 import {
   Sheet,
   SheetClose,
   SheetContent,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -33,11 +38,104 @@ type InvoicePDFPreviewProps = {
 }
 
 export function InvoicePDFPreview({ invoice, open, onOpenChange }: InvoicePDFPreviewProps) {
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+
   const fmt = (n: number) => "₹" + n.toLocaleString("en-IN")
   const clientName = invoice.client?.trim() ?? ""
   const organizationName = invoice.org?.trim() ?? ""
   const primaryBillTo = organizationName || clientName || "-"
   const showSecondaryClient = Boolean(clientName) && clientName.toLowerCase() !== organizationName.toLowerCase()
+
+  const generatePDF = useCallback(async () => {
+    setIsGenerating(true)
+    try {
+      const supabase = getSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const accessToken = session?.access_token
+      if (!accessToken) {
+        throw new Error("Please sign in before generating PDFs.")
+      }
+
+      const response = await fetch("/api/invoices/generate-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ invoice }),
+      })
+
+      if (!response.ok) {
+        const errorData = (await response.json()) as { error?: string }
+        throw new Error(errorData.error ?? "Failed to generate PDF")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${invoice.id}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast.success("PDF downloaded successfully!")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error generating PDF"
+      toast.error(message)
+      console.error("Error generating PDF:", error)
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [invoice])
+
+  const sendToClient = useCallback(async () => {
+    if (!invoice.email) {
+      toast.error("Client email is required to send invoice")
+      return
+    }
+
+    setIsSending(true)
+    try {
+      const supabase = getSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const accessToken = session?.access_token
+      if (!accessToken) {
+        throw new Error("Please sign in before sending invoices.")
+      }
+
+      const response = await fetch("/api/invoices/send-to-client", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ invoice }),
+      })
+
+      if (!response.ok) {
+        const errorData = (await response.json()) as { error?: string }
+        throw new Error(errorData.error ?? "Failed to send invoice")
+      }
+
+      await response.json()
+      toast.success("Invoice sent to the client")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error sending invoice"
+      toast.error(message)
+      console.error("Error sending invoice:", error)
+    } finally {
+      setIsSending(false)
+    }
+  }, [invoice])
 
   const subtotal = invoice.lineItems.reduce((sum, item) => sum + item.quantity * item.rate, 0)
   const discount = Math.max(0, Math.min(subtotal, invoice.discount || 0))
@@ -163,6 +261,43 @@ export function InvoicePDFPreview({ invoice, open, onOpenChange }: InvoicePDFPre
             </div>
           </div>
         </div>
+
+        <SheetFooter
+          className="panel-footer pdf-preview-footer"
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            gap: "10px",
+            padding: "16px 24px",
+            borderTop: "1px solid #2a3b57",
+            background: "#161920",
+            flexShrink: 0,
+            width: "100%",
+          }}
+        >
+          <Button
+            type="button"
+            className="btn btn-ghost"
+            variant="outline"
+            onClick={() => void sendToClient()}
+            disabled={isSending || !invoice.email}
+            style={{ flex: 1, padding: "7px 14px", fontSize: "13px", color: isSending || !invoice.email ? "#555" : "#8B95A8", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+            title={!invoice.email ? "Client email is required" : "Send invoice to client email"}
+          >
+            <Send size={16} />
+            {isSending ? "Starting..." : "Send to client"}
+          </Button>
+          <Button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => void generatePDF()}
+            disabled={isGenerating}
+            style={{ flex: 1, padding: "7px 14px", fontSize: "13px", backgroundColor: "#3B82F6", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+          >
+            <Download size={16} />
+            {isGenerating ? "Generating..." : "Download PDF"}
+          </Button>
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   )

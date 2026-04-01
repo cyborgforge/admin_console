@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import puppeteer from "puppeteer"
+import { requestPdfBuffer } from "@/lib/pdfService"
 import type { Quotation } from "@/types/quotation"
 
 export const runtime = "nodejs"
@@ -7,8 +7,6 @@ export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
-
   try {
     const { quotation } = await request.json() as { quotation: Quotation }
 
@@ -288,27 +286,20 @@ export async function POST(request: NextRequest) {
       </html>
     `
 
-    // Launch browser and generate PDF
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    })
-
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: "networkidle0" })
-
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      margin: {
-        top: "0px",
-        right: "0px",
-        bottom: "0px",
-        left: "0px",
+    const pdfBuffer = await requestPdfBuffer({
+      html,
+      fileName: `${quotation.id}.pdf`,
+      options: {
+        format: "A4",
+        printBackground: true,
+        margin: {
+          top: "0px",
+          right: "0px",
+          bottom: "0px",
+          left: "0px",
+        },
       },
     })
-
-    await browser.close()
-    browser = null
     const pdfBytes = Uint8Array.from(pdfBuffer)
 
     return new NextResponse(pdfBytes, {
@@ -323,9 +314,5 @@ export async function POST(request: NextRequest) {
       { error: "Failed to generate PDF" },
       { status: 500 }
     )
-  } finally {
-    if (browser) {
-      await browser.close()
-    }
   }
 }

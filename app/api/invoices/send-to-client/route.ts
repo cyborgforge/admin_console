@@ -1,6 +1,6 @@
 import { after, NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import puppeteer from "puppeteer"
+import { requestPdfBuffer } from "@/lib/pdfService"
 
 type InvoicePdfLineItem = {
   description: string
@@ -165,45 +165,55 @@ async function sendInvoiceInBackground(invoice: InvoicePdfPayload, recipientEmai
   const resend = new Resend(resendApiKey)
   const html = generateInvoiceHTML(invoice)
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  const pdfBuffer = await requestPdfBuffer({
+    html,
+    fileName: `${invoice.id}.pdf`,
+    options: {
+      format: "A4",
+      printBackground: true,
+    },
   })
 
-  try {
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: "networkidle0" })
-    const pdf = await page.pdf({ format: "A4" })
-    const pdfBuffer = Buffer.from(pdf)
+  const response = await resend.emails.send({
+    from: resendFromEmail,
+    to: recipientEmail,
+    subject: `Invoice ${invoice.id} from Fluxworks`,
+    html: `
+      <div style="font-family: 'DM Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1a1a2e; margin-bottom: 12px;">Hello ${invoice.client || invoice.org},</h2>
+        <p style="margin-bottom: 16px;">Please find your invoice attached.</p>
+        
+        <div style="background: #f9f9f9; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+          <p style="margin: 0 0 12px 0;"><strong style="color: #1a1a2e;">Invoice Details:</strong></p>
+          <ul style="margin: 0; padding-left: 20px;">
+            <li style="margin-bottom: 8px;"><strong>Invoice ID:</strong> ${invoice.id}</li>
+            <li style="margin-bottom: 8px;"><strong>Organization:</strong> ${invoice.org || "-"}</li>
+            <li style="margin-bottom: 8px;"><strong>Due Date:</strong> ${invoice.due || "-"}</li>
+            <li style="margin-bottom: 0;"><strong>Tax Type:</strong> ${invoice.taxType === "cgst_sgst" ? "CGST + SGST" : "IGST"}</li>
+          </ul>
+        </div>
 
-    const response = await resend.emails.send({
-      from: resendFromEmail,
-      to: recipientEmail,
-      subject: `Invoice ${invoice.id} from Fluxworks`,
-      html: `
-        <h2>Hello ${invoice.client || invoice.org},</h2>
-        <p>Please find your invoice attached.</p>
-        <p><strong>Invoice details:</strong></p>
-        <ul>
-          <li>ID: ${invoice.id}</li>
-          <li>Organization: ${invoice.org}</li>
-          <li>Due date: ${invoice.due || "-"}</li>
-        </ul>
-        <p>Best regards,<br/>Fluxworks Team</p>
-      `,
-      attachments: [
-        {
-          filename: `${invoice.id}.pdf`,
-          content: pdfBuffer,
-        },
-      ],
-    })
+        <div style="background: #f0f7ff; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 20px;">
+          <p style="margin: 0; color: #333; font-size: 14px;">
+            ${invoice.paymentTerms || "Payment due as per agreed terms."}
+          </p>
+        </div>
 
-    if (response.error) {
-      throw new Error(`Failed to send email: ${response.error.message}`)
-    }
-  } finally {
-    await browser.close()
+        <p style="color: #666; margin-bottom: 12px;">If you have any questions or need clarification, please don't hesitate to reach out.</p>
+        
+        <p style="color: #666; margin: 0;">Best regards,<br/><strong>Fluxworks Team</strong></p>
+      </div>
+    `,
+    attachments: [
+      {
+        filename: `${invoice.id}.pdf`,
+        content: pdfBuffer,
+      },
+    ],
+  })
+
+  if (response.error) {
+    throw new Error(`Failed to send email: ${response.error.message}`)
   }
 }
 

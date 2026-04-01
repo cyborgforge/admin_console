@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import puppeteer from "puppeteer"
 import { getSupabaseServerClient } from "@/lib/supabaseServer"
+import { requestPdfBuffer } from "@/lib/pdfService"
 import type { Quotation } from "@/types/quotation"
 
 const resendApiKey = process.env.RESEND_API_KEY
@@ -262,60 +262,54 @@ async function sendQuotationEmail(quotation: Quotation, recipientEmail: string) 
 
   const resend = new Resend(resendApiKey)
 
-  // Generate PDF
   const html = generateQuotationHTML(quotation)
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+
+  const pdfBuffer = await requestPdfBuffer({
+    html,
+    fileName: `${quotation.id}.pdf`,
+    options: {
+      format: "A4",
+      printBackground: true,
+    },
   })
 
-  try {
-    const page = await browser.newPage()
-    await page.setContent(html)
-    const pdf = await page.pdf({ format: "A4" })
-    const pdfBuffer = Buffer.from(pdf)
+  const response = await resend.emails.send({
+    from: resendFromEmail,
+    to: recipientEmail,
+    subject: `Quotation ${quotation.id} from Fluxworks`,
+    html: `
+      <h2>Hello ${quotation.client || quotation.organization},</h2>
+      <p>Please find your quotation attached.</p>
+      <p><strong>Quotation Details:</strong></p>
+      <ul>
+        <li>ID: ${quotation.id}</li>
+        <li>Organization: ${quotation.organization}</li>
+        <li>Valid for: 30 days</li>
+      </ul>
+      <p>If you have any questions, please don't hesitate to reach out.</p>
+      <p>Best regards,<br/>Fluxworks Team</p>
+    `,
+    attachments: [
+      {
+        filename: `${quotation.id}.pdf`,
+        content: pdfBuffer,
+      },
+    ],
+  })
 
-    // Send email with PDF attachment
-    const response = await resend.emails.send({
-      from: resendFromEmail,
-      to: recipientEmail,
-      subject: `Quotation ${quotation.id} from Fluxworks`,
-      html: `
-        <h2>Hello ${quotation.client || quotation.organization},</h2>
-        <p>Please find your quotation attached.</p>
-        <p><strong>Quotation Details:</strong></p>
-        <ul>
-          <li>ID: ${quotation.id}</li>
-          <li>Organization: ${quotation.organization}</li>
-          <li>Valid for: 30 days</li>
-        </ul>
-        <p>If you have any questions, please don't hesitate to reach out.</p>
-        <p>Best regards,<br/>Fluxworks Team</p>
-      `,
-      attachments: [
-        {
-          filename: `${quotation.id}.pdf`,
-          content: pdfBuffer,
-        },
-      ],
-    })
+  if (response.error) {
+    throw new Error(`Failed to send email: ${response.error.message}`)
+  }
 
-    if (response.error) {
-      throw new Error(`Failed to send email: ${response.error.message}`)
-    }
+  // Update quotation in database to mark as sent
+  const supabase = getSupabaseServerClient()
+  const { error: updateError } = await supabase
+    .from("quotations")
+    .update({ sent_at: new Date().toISOString() })
+    .eq("id", quotation.id)
 
-    // Update quotation in database to mark as sent
-    const supabase = getSupabaseServerClient()
-    const { error: updateError } = await supabase
-      .from("quotations")
-      .update({ sent_at: new Date().toISOString() })
-      .eq("id", quotation.id)
-
-    if (updateError) {
-      console.error("Failed to update quotation after send:", updateError)
-    }
-  } finally {
-    await browser.close()
+  if (updateError) {
+    console.error("Failed to update quotation after send:", updateError)
   }
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import puppeteer from "puppeteer"
+import { requestPdfBuffer } from "@/lib/pdfService"
 
 type InvoicePdfLineItem = {
   description: string
@@ -240,8 +240,6 @@ function generateInvoiceHTML(invoice: InvoicePdfPayload): string {
 }
 
 export async function POST(request: NextRequest) {
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
-
   try {
     const { invoice } = (await request.json()) as { invoice: InvoicePdfPayload }
 
@@ -250,27 +248,20 @@ export async function POST(request: NextRequest) {
     }
 
     const html = generateInvoiceHTML(invoice)
-
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    })
-
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: "networkidle0" })
-
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      margin: {
-        top: "0px",
-        right: "0px",
-        bottom: "0px",
-        left: "0px",
+    const pdfBuffer = await requestPdfBuffer({
+      html,
+      fileName: `${invoice.id}.pdf`,
+      options: {
+        format: "A4",
+        printBackground: true,
+        margin: {
+          top: "0px",
+          right: "0px",
+          bottom: "0px",
+          left: "0px",
+        },
       },
     })
-
-    await browser.close()
-    browser = null
 
     return new NextResponse(Uint8Array.from(pdfBuffer), {
       headers: {
@@ -281,9 +272,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error generating invoice PDF:", error)
     return NextResponse.json({ error: "Failed to generate invoice PDF" }, { status: 500 })
-  } finally {
-    if (browser) {
-      await browser.close()
-    }
   }
 }
