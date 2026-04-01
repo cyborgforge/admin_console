@@ -11,13 +11,15 @@ const defaultPdfOptions = {
 }
 
 function getPdfServiceConfig() {
-  const baseUrl = process.env.PDF_SERVICE_URL
+  const baseUrl = process.env.PDF_SERVICE_URL?.trim()
   if (!baseUrl) {
     throw new Error("PDF_SERVICE_URL is not configured")
   }
 
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, "")
+
   return {
-    baseUrl,
+    baseUrl: normalizedBaseUrl,
     token: process.env.PDF_SERVICE_TOKEN,
   }
 }
@@ -28,8 +30,9 @@ export async function requestPdfBuffer(input: GeneratePdfInput): Promise<Buffer>
   }
 
   const { baseUrl, token } = getPdfServiceConfig()
+  const endpoint = new URL("/pdf/generate", baseUrl).toString()
 
-  const response = await fetch(`${baseUrl}/pdf/generate`, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
