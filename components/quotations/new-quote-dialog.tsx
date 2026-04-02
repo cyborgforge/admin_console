@@ -1,11 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { getSupabaseClient } from "@/lib/supabaseClient"
-import { useQuotations } from "@/hooks/use-quotations"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -19,6 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import type { CreateClientPayload, Client } from "@/types/client"
 import type { CreateQuotationPayload, Quotation, QuotationLineItem, UpdateQuotationPayload } from "@/types/quotation"
 
 type CoreModule = {
@@ -158,6 +158,22 @@ function getSuiteKey(productLabel: string) {
   return "pharmacy"
 }
 
+function getProductLabel(suite: string) {
+  if (suite === "clinic") return "Clinic Management Suite"
+  if (suite === "retail") return "Retail Suite"
+  return "Pharmacy Management Suite"
+}
+
+function getIndustryLabel(suite: string) {
+  if (suite === "clinic") return "Healthcare / Clinic"
+  if (suite === "retail") return "Retail"
+  return "Pharmacy"
+}
+
+function normalizeClientValue(value: string) {
+  return value.trim().toLowerCase()
+}
+
 export function NewQuoteDialog({
   triggerClassName,
   mode = "create",
@@ -168,9 +184,11 @@ export function NewQuoteDialog({
   onOpenChange,
   onSaveEdit,
 }: NewQuoteDialogProps) {
-  const { quotations } = useQuotations()
   const [internalOpen, setInternalOpen] = useState(false)
+  const [clients, setClients] = useState<Client[]>([])
+  const [clientsLoading, setClientsLoading] = useState(false)
   const [showClientDropdown, setShowClientDropdown] = useState(false)
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   const [client, setClient] = useState("")
   const [organization, setOrganization] = useState("")
   const [email, setEmail] = useState("")
@@ -197,30 +215,41 @@ export function NewQuoteDialog({
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [emailTouched, setEmailTouched] = useState(false)
-  const [phoneTouched, setPhoneTouched] = useState(false)
+  const [validationAttempted, setValidationAttempted] = useState(false)
 
   const clientSearchTerm = client.trim().toLowerCase()
   const matchedClients = useMemo(() => {
     if (!clientSearchTerm) {
-      return [] as Quotation[]
+      return [] as Client[]
     }
 
-    const uniqueMatches = new Map<string, Quotation>()
+    const uniqueMatches = new Map<string, Client>()
 
-    for (const quotation of quotations) {
-      const normalizedName = quotation.client.trim().toLowerCase()
+    for (const clientRecord of clients) {
+      const normalizedName = normalizeClientValue(clientRecord.name)
+      const normalizedOrganization = normalizeClientValue(clientRecord.organization)
+      const normalizedEmail = normalizeClientValue(clientRecord.email)
+
       if (!normalizedName) {
         continue
       }
 
-      if (normalizedName.includes(clientSearchTerm) && !uniqueMatches.has(normalizedName)) {
-        uniqueMatches.set(normalizedName, quotation)
+      if (
+        (normalizedName.includes(clientSearchTerm) ||
+          normalizedOrganization.includes(clientSearchTerm) ||
+          normalizedEmail.includes(clientSearchTerm)) &&
+        !uniqueMatches.has(clientRecord.id)
+      ) {
+        uniqueMatches.set(clientRecord.id, clientRecord)
       }
     }
 
     return Array.from(uniqueMatches.values()).slice(0, 5)
-  }, [clientSearchTerm, quotations])
+  }, [clientSearchTerm, clients])
+
+  const selectedClient = selectedClientId
+    ? clients.find((item) => item.id === selectedClientId) ?? null
+    : null
 
   const isOpen = typeof open === "boolean" ? open : internalOpen
 
@@ -231,24 +260,26 @@ export function NewQuoteDialog({
     onOpenChange?.(nextOpen)
   }
 
-  // Validation functions
   const validateEmail = (emailValue: string) => {
-    if (!emailValue.trim()) return true
-    // More flexible email regex that handles most common formats
+    if (!emailValue.trim()) return false
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return emailRegex.test(emailValue.toLowerCase())
   }
 
   const validatePhone = (phoneValue: string) => {
-    if (!phoneValue.trim()) return true
-    // Remove spaces and special chars for validation, then check minimum digits
+    if (!phoneValue.trim()) return false
     const digitsOnly = phoneValue.replace(/\D/g, "")
     return digitsOnly.length >= 10
   }
 
-  // Validation states
-  const isEmailInvalid = emailTouched && email.trim() && !validateEmail(email)
-  const isPhoneInvalid = phoneTouched && phone.trim() && !validatePhone(phone)
+  const isClientInvalid = validationAttempted && !client.trim()
+  const isOrganizationInvalid = validationAttempted && !organization.trim()
+  const isEmailInvalid = validationAttempted && !validateEmail(email)
+  const isPhoneInvalid = validationAttempted && !validatePhone(phone)
+  const isProductInvalid = validationAttempted && !product.trim()
+  const isExpiryInvalid = validationAttempted && !expiry.trim()
+  const discountValue = Number(discount)
+  const isDiscountInvalid = validationAttempted && (discount.trim() === "" || !Number.isFinite(discountValue) || discountValue < 0)
 
   const suite = SUITE_CATALOGUE[product] || SUITE_CATALOGUE.pharmacy
 
@@ -282,6 +313,41 @@ export function NewQuoteDialog({
     }
   }, [activeCoreModules, activeAddonModules, customModules, supportItems, discount])
 
+  const loadClients = useCallback(async () => {
+    setClientsLoading(true)
+
+    try {
+      const supabase = getSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const token = session?.access_token
+      if (!token) {
+        throw new Error("Please sign in to load clients.")
+      }
+
+      const response = await fetch("/api/clients", {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const responseData = (await response.json()) as { error?: string }
+        throw new Error(responseData.error ?? "Failed to load clients.")
+      }
+
+      const data = (await response.json()) as { clients?: Client[] }
+      setClients(data.clients ?? [])
+    } catch {
+      setClients([])
+    } finally {
+      setClientsLoading(false)
+    }
+  }, [])
+
   const resetForm = () => {
     setClient("")
     setOrganization("")
@@ -298,14 +364,32 @@ export function NewQuoteDialog({
     setShowAddonCatalogue(false)
     setShowCustomModuleForm(false)
     setShowClientDropdown(false)
+    setSelectedClientId(null)
     setCustomModuleName("")
     setCustomModuleSuite("pharmacy")
     setCustomModulePrice("")
     setSupportItems(DEFAULT_SUPPORT_ITEMS.map((s) => ({ ...s })))
     setError(null)
-    setEmailTouched(false)
-    setPhoneTouched(false)
+    setValidationAttempted(false)
   }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    void loadClients()
+
+    const handleClientChanged = () => {
+      void loadClients()
+    }
+
+    window.addEventListener("client:changed", handleClientChanged)
+
+    return () => {
+      window.removeEventListener("client:changed", handleClientChanged)
+    }
+  }, [isOpen, loadClients])
 
   useEffect(() => {
     if (mode !== "edit" || !quotationToEdit || !isOpen) {
@@ -366,8 +450,8 @@ export function NewQuoteDialog({
     setCustomModuleSuite(suiteKey)
     setCustomModulePrice("")
     setError(null)
-    setEmailTouched(false)
-    setPhoneTouched(false)
+    setValidationAttempted(false)
+    setSelectedClientId(null)
   }, [isOpen, mode, quotationToEdit])
 
   useEffect(() => {
@@ -380,7 +464,18 @@ export function NewQuoteDialog({
     setEmail(initialClient.email ?? "")
     setPhone(initialClient.phone ?? "")
     setShowClientDropdown(false)
+    setValidationAttempted(false)
   }, [initialClient, isOpen, mode])
+
+  const applyClientSelection = (clientRecord: Client) => {
+    setClient(clientRecord.name)
+    setOrganization(clientRecord.organization)
+    setEmail(clientRecord.email)
+    setPhone(clientRecord.phone)
+    setProduct(getSuiteKey(clientRecord.product))
+    setSelectedClientId(clientRecord.id)
+    setShowClientDropdown(false)
+  }
 
   const handleSuiteChange = (newSuite: string) => {
     setProduct(newSuite)
@@ -448,26 +543,61 @@ export function NewQuoteDialog({
     )
   }
 
+  const buildClientPayload = (productLabel: string): CreateClientPayload => ({
+    name: client.trim(),
+    role: "Owner",
+    organization: organization.trim(),
+    industry: getIndustryLabel(product),
+    city: "Chennai",
+    email: email.trim(),
+    phone: phone.trim(),
+    status: "prospect",
+    product: productLabel,
+    gst: "-",
+    notes: notes.trim(),
+  })
+
   async function submitQuotation(status?: "draft" | "sent") {
     setError(null)
+    setValidationAttempted(true)
 
-    if (!client.trim() || !organization.trim()) {
-      setError("Client and organization are required.")
+    const trimmedClient = client.trim()
+    const trimmedOrganization = organization.trim()
+    const trimmedEmail = email.trim()
+    const trimmedPhone = phone.trim()
+    const trimmedNotes = notes.trim()
+    const trimmedExpiry = expiry.trim()
+    const trimmedDiscount = discount.trim()
+    const numericDiscount = Number(discount)
+    const totalLineItems = activeCoreModules.length + activeAddonModules.length + customModules.length + supportItems.filter((item) => item.enabled).length
+
+    if (
+      !trimmedClient ||
+      !trimmedOrganization ||
+      !trimmedEmail ||
+      !trimmedPhone ||
+      !trimmedExpiry ||
+      !product.trim() ||
+      trimmedDiscount === "" ||
+      !Number.isFinite(numericDiscount) ||
+      numericDiscount < 0
+    ) {
+      setError("All quotation fields are mandatory.")
       return
     }
 
-    if (email.trim() && !validateEmail(email)) {
+    if (totalLineItems === 0) {
+      setError("Add at least one module or support item.")
+      return
+    }
+
+    if (!validateEmail(trimmedEmail)) {
       setError("Please enter a valid email address.")
       return
     }
 
-    if (phone.trim() && !validatePhone(phone)) {
+    if (!validatePhone(trimmedPhone)) {
       setError("Please enter a valid phone number (minimum 10 digits).")
-      return
-    }
-
-    if (status === "sent" && !email.trim()) {
-      setError("Client email is required to send quotation.")
       return
     }
 
@@ -484,6 +614,37 @@ export function NewQuoteDialog({
         throw new Error("Please sign in before creating quotations.")
       }
 
+      const productLabel = getProductLabel(product)
+      const existingClient = selectedClient ?? clients.find((record) => normalizeClientValue(record.name) === normalizeClientValue(trimmedClient)) ?? null
+
+      if (!existingClient) {
+        const clientResponse = await fetch("/api/clients", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(buildClientPayload(productLabel)),
+        })
+
+        if (!clientResponse.ok) {
+          const clientError = (await clientResponse.json()) as { error?: string }
+          throw new Error(clientError.error ?? "Failed to create client from quotation details.")
+        }
+
+        const clientData = (await clientResponse.json()) as { client?: Client }
+        const createdClient = clientData.client
+
+        if (createdClient) {
+          setClients((current) => {
+            const filtered = current.filter((record) => record.id !== createdClient.id)
+            return [createdClient, ...filtered]
+          })
+          setSelectedClientId(createdClient.id)
+          window.dispatchEvent(new CustomEvent("client:changed", { detail: { client: createdClient } }))
+        }
+      }
+
       const lineItems: QuotationLineItem[] = [
         ...activeCoreModules.map((m) => ({ name: m.name, quantity: 1, unitPrice: m.price })),
         ...activeAddonModules.map((m) => ({ name: m.name, quantity: 1, unitPrice: m.price })),
@@ -493,24 +654,17 @@ export function NewQuoteDialog({
           .map((s) => ({ name: s.name, quantity: Number(s.selectedOption), unitPrice: s.basePrice })),
       ]
 
-      const productLabel =
-        product === "pharmacy"
-          ? "Pharmacy Management Suite"
-          : product === "clinic"
-            ? "Clinic Management Suite"
-            : "Retail Suite"
-
       const payload: CreateQuotationPayload = {
-        client,
-        organization,
-        email: email.trim() || undefined,
-        phone: phone.trim() || undefined,
+        client: trimmedClient,
+        organization: trimmedOrganization,
+        email: trimmedEmail,
+        phone: trimmedPhone,
         product: productLabel,
         status,
-        expiry: expiry || "-",
-        discount: Number(discount) || 0,
+        expiry: trimmedExpiry,
+        discount: numericDiscount,
         lineItems,
-        notes,
+        notes: trimmedNotes || undefined,
       }
 
       if (mode === "edit") {
@@ -643,17 +797,22 @@ export function NewQuoteDialog({
               <div className="form-group" style={{ position: "relative" }}>
                 <label className="form-label">Client name</label>
                 <div style={{ position: "relative" }}>
-                  <Input 
-                    className="form-input" 
-                    placeholder="e.g. Apollo Pharmacy" 
-                    value={client} 
+                  <Input
+                    className="form-input"
+                    placeholder="e.g. Apollo Pharmacy"
+                    value={client}
                     onChange={(e) => {
                       setClient(e.target.value)
+                      setSelectedClientId(null)
                       setShowClientDropdown(true)
                     }}
                     onFocus={() => setShowClientDropdown(true)}
+                    style={{
+                      borderColor: isClientInvalid ? "#ef4444" : undefined,
+                      backgroundColor: isClientInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
+                    }}
                   />
-                  {showClientDropdown && client.trim().length > 0 && matchedClients.length > 0 && (
+                  {showClientDropdown && client.trim().length > 0 && (
                     <div
                       style={{
                         position: "absolute",
@@ -670,14 +829,17 @@ export function NewQuoteDialog({
                         boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
                       }}
                     >
-                      {matchedClients.map((quote) => (
+                      {clientsLoading ? (
+                        <div style={{ padding: "10px 12px", color: "#94a3b8", fontSize: "12px" }}>
+                          Loading clients...
+                        </div>
+                      ) : matchedClients.length > 0 ? (
+                        matchedClients.map((clientRecord) => (
                           <button
-                            key={quote.id}
+                            key={clientRecord.id}
                             type="button"
                             onClick={() => {
-                              setClient(quote.client)
-                              setOrganization(quote.organization)
-                              setShowClientDropdown(false)
+                              applyClientSelection(clientRecord)
                             }}
                             style={{
                               width: "100%",
@@ -700,59 +862,82 @@ export function NewQuoteDialog({
                               e.currentTarget.style.color = "#e8eaf0"
                             }}
                           >
-                            {quote.client}
+                            <span style={{ display: "block" }}>{clientRecord.name}</span>
+                            <span style={{ display: "block", fontSize: "11px", color: "#94a3b8" }}>
+                              {clientRecord.organization}
+                            </span>
                           </button>
-                        ))}
+                        ))
+                      ) : (
+                        <div style={{ padding: "10px 12px", color: "#94a3b8", fontSize: "12px" }}>
+                          No existing client matches. A new client will be created when you save.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
+                {isClientInvalid ? (
+                  <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
+                    Client name is required.
+                  </div>
+                ) : null}
               </div>
               <div className="form-group">
                 <label className="form-label">Organisation</label>
-                <Input className="form-input" placeholder="Company or hospital name" value={organization} onChange={(e) => setOrganization(e.target.value)} />
+                <Input
+                  className="form-input"
+                  placeholder="Company or hospital name"
+                  value={organization}
+                  onChange={(e) => setOrganization(e.target.value)}
+                  style={{
+                    borderColor: isOrganizationInvalid ? "#ef4444" : undefined,
+                    backgroundColor: isOrganizationInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
+                  }}
+                />
+                {isOrganizationInvalid ? (
+                  <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
+                    Organisation name is required.
+                  </div>
+                ) : null}
               </div>
             </div>
             <div className="form-row" style={{ marginTop: "10px" }}>
               <div className="form-group">
                 <label className="form-label">Email</label>
-                <Input 
-                  className="form-input" 
-                  type="email" 
-                  placeholder="billing@client.com" 
-                  value={email} 
+                <Input
+                  className="form-input"
+                  type="email"
+                  placeholder="billing@client.com"
+                  value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => setEmailTouched(true)}
-                  onFocus={() => setEmailTouched(true)}
                   style={{
                     borderColor: isEmailInvalid ? "#ef4444" : undefined,
                     backgroundColor: isEmailInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
                   }}
                 />
-                {isEmailInvalid && (
+                {isEmailInvalid ? (
                   <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
-                    Please enter a valid email address
+                    Please enter a valid email address.
                   </div>
-                )}
+                ) : null}
               </div>
               <div className="form-group">
                 <label className="form-label">Phone</label>
-                <Input 
-                  className="form-input" 
-                  placeholder="+91 98xxx xxxxx" 
-                  value={phone} 
+                <Input
+                  className="form-input"
+                  placeholder="+91 98xxx xxxxx"
+                  value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  onBlur={() => setPhoneTouched(true)}
-                  onFocus={() => setPhoneTouched(true)}
                   style={{
                     borderColor: isPhoneInvalid ? "#ef4444" : undefined,
                     backgroundColor: isPhoneInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
                   }}
                 />
-                {isPhoneInvalid && (
+                {isPhoneInvalid ? (
                   <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
-                    Please enter a valid phone number (minimum 10 digits)
+                    Please enter a valid phone number (minimum 10 digits).
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -763,15 +948,42 @@ export function NewQuoteDialog({
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Product suite</label>
-                <select className="form-input" value={product} onChange={(e) => handleSuiteChange(e.target.value)}>
+                <select
+                  className="form-input"
+                  value={product}
+                  onChange={(e) => handleSuiteChange(e.target.value)}
+                  style={{
+                    borderColor: isProductInvalid ? "#ef4444" : undefined,
+                    backgroundColor: isProductInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
+                  }}
+                >
                   <option value="pharmacy">Pharmacy Management Suite</option>
                   <option value="clinic">Clinic Management Suite</option>
                   <option value="retail">Retail Suite</option>
                 </select>
+                {isProductInvalid ? (
+                  <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
+                    Product suite is required.
+                  </div>
+                ) : null}
               </div>
               <div className="form-group">
                 <label className="form-label">Valid until</label>
-                <Input className="form-input" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+                <Input
+                  className="form-input"
+                  type="date"
+                  value={expiry}
+                  onChange={(e) => setExpiry(e.target.value)}
+                  style={{
+                    borderColor: isExpiryInvalid ? "#ef4444" : undefined,
+                    backgroundColor: isExpiryInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
+                  }}
+                />
+                {isExpiryInvalid ? (
+                  <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>
+                    Quote expiry date is required.
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -1175,12 +1387,19 @@ export function NewQuoteDialog({
                     fontSize: "12px",
                     borderRadius: "4px",
                     fontFamily: "var(--font-dm-mono)",
+                    borderColor: isDiscountInvalid ? "#ef4444" : undefined,
+                    backgroundColor: isDiscountInvalid ? "rgba(239, 68, 68, 0.05)" : undefined,
                   }}
                 />
                 <span style={{ fontSize: "13px", color: "#4F5A6A" }}>₹</span>
               </span>
               <span style={{ fontFamily: "var(--font-dm-mono)", color: "#10B981" }}>− {fmt(computedTotal.discount)}</span>
             </div>
+            {isDiscountInvalid ? (
+              <div style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px" }}>
+                Discount is required and must be zero or greater.
+              </div>
+            ) : null}
             <div className="summary-row">
               <span>GST (18%)</span>
               <span style={{ fontFamily: "var(--font-dm-mono)" }}>{fmt(computedTotal.gst)}</span>

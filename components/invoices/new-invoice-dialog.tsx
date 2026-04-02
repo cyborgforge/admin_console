@@ -24,6 +24,13 @@ import { QuotationPDFPreview } from "@/components/quotations/quotation-pdf-previ
 import type { CreateInvoicePayload, Invoice, InvoiceLineItem, UpdateInvoicePayload } from "@/types/invoice"
 import type { Quotation } from "@/types/quotation"
 
+type ClientDirectoryItem = {
+  name?: string
+  organization?: string
+  email?: string
+  gst?: string
+}
+
 type NewInvoiceDialogProps = {
   triggerClassName?: string
   mode?: "create" | "edit"
@@ -58,6 +65,7 @@ export function NewInvoiceDialog({
   const [paymentTerms, setPaymentTerms] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [previewingInvoice, setPreviewingInvoice] = useState<InvoicePreviewPayload | null>(null)
+  const [clientDirectory, setClientDirectory] = useState<ClientDirectoryItem[]>([])
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
     { description: "", quantity: 1, rate: 0 },
   ])
@@ -71,6 +79,73 @@ export function NewInvoiceDialog({
     }
     onOpenChange?.(nextOpen)
   }
+
+  const findClientMatch = (nameValue: string, orgValue: string) => {
+    const normalizedName = nameValue.trim().toLowerCase()
+    const normalizedOrg = orgValue.trim().toLowerCase()
+
+    return clientDirectory.find((row) => {
+      const rowName = row.name?.trim().toLowerCase() ?? ""
+      const rowOrg = row.organization?.trim().toLowerCase() ?? ""
+
+      if (normalizedOrg && rowOrg === normalizedOrg) {
+        return true
+      }
+
+      if (normalizedName && rowName === normalizedName) {
+        return true
+      }
+
+      return false
+    })
+  }
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadClients() {
+      if (!isOpen) {
+        return
+      }
+
+      try {
+        const supabase = getSupabaseClient()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        const accessToken = session?.access_token
+        if (!accessToken) {
+          return
+        }
+
+        const response = await fetch("/api/clients", {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        })
+
+        if (!response.ok) {
+          return
+        }
+
+        const data = (await response.json()) as { clients?: ClientDirectoryItem[] }
+        if (!cancelled) {
+          setClientDirectory(data.clients ?? [])
+        }
+      } catch {
+        if (!cancelled) {
+          setClientDirectory([])
+        }
+      }
+    }
+
+    void loadClients()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen])
 
   const clientSearchTerm = client.trim().toLowerCase()
   const matchedClients = useMemo(() => {
@@ -229,14 +304,19 @@ export function NewInvoiceDialog({
     if (!quoteRef) {
       setOrg("")
       setEmail("")
+      setGstin("")
       return
     }
 
     const selectedQuote = quotations.find(q => q.id === quoteRef)
     if (selectedQuote) {
+      const matchedClient = findClientMatch(selectedQuote.client, selectedQuote.organization)
+      const gstValue = matchedClient?.gst?.trim()
+
       setClient(selectedQuote.client)
       setOrg(selectedQuote.organization)
-      setEmail(selectedQuote.email ?? "")
+      setEmail(selectedQuote.email ?? matchedClient?.email ?? "")
+      setGstin(gstValue && gstValue !== "-" ? gstValue : "")
       
       // Create line items from quotation line items
       if (selectedQuote.lineItems && selectedQuote.lineItems.length > 0) {
@@ -560,9 +640,13 @@ export function NewInvoiceDialog({
                           key={quote.id}
                           type="button"
                           onClick={() => {
+                            const matchedClient = findClientMatch(quote.client, quote.organization)
+                            const gstValue = matchedClient?.gst?.trim()
+
                             setClient(quote.client)
                             setOrg(quote.organization)
-                            setEmail(quote.email ?? "")
+                            setEmail(quote.email ?? matchedClient?.email ?? "")
+                            setGstin(gstValue && gstValue !== "-" ? gstValue : "")
                             setShowClientDropdown(false)
                           }}
                           style={{
