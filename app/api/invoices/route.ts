@@ -312,13 +312,40 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const authResult = await requireAuthenticatedRequest(request)
-  if (authResult.errorResponse || !authResult.supabase || !authResult.userId) {
+  if (authResult.errorResponse || !authResult.supabase) {
     return authResult.errorResponse!
   }
 
   try {
-    const body = (await request.json()) as Partial<CreateInvoicePayload>
-    const normalized = normalizeCreatePayload(body)
+    const body = (await request.json()) as Partial<CreateInvoicePayload> & Partial<UpdateInvoicePayload>
+    const invoiceId = readString(body.id)
+
+    if (invoiceId) {
+      const updateData = buildUpdateData(body as UpdateInvoicePayload)
+
+      if (Object.keys(updateData).length === 0) {
+        return NextResponse.json({ error: "No updatable fields were provided." }, { status: 400 })
+      }
+
+      const { data, error } = await authResult.supabase
+        .from(INVOICES_TABLE)
+        .update(updateData)
+        .eq("id", invoiceId)
+        .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color, gstin, email, gst_rate, tax_type, discount, payment_terms, line_items")
+        .single()
+
+      if (error || !data) {
+        return NextResponse.json(
+          { error: error?.message ?? "Failed to update invoice." },
+          { status: 400 },
+        )
+      }
+
+      const invoice = mapInvoice(data as Record<string, unknown>)
+      return NextResponse.json({ invoice })
+    }
+
+    const normalized = normalizeCreatePayload(body as Partial<CreateInvoicePayload>)
 
     const { data, error } = await authResult.supabase
       .from(INVOICES_TABLE)
@@ -360,44 +387,4 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
-  const authResult = await requireAuthenticatedRequest(request)
-  if (authResult.errorResponse || !authResult.supabase) {
-    return authResult.errorResponse!
-  }
-
-  try {
-    const body = (await request.json()) as UpdateInvoicePayload
-    const invoiceId = readString(body.id)
-
-    if (!invoiceId) {
-      return NextResponse.json({ error: "id is required." }, { status: 400 })
-    }
-
-    const updateData = buildUpdateData(body)
-
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ error: "No updatable fields were provided." }, { status: 400 })
-    }
-
-    const { data, error } = await authResult.supabase
-      .from(INVOICES_TABLE)
-      .update(updateData)
-      .eq("id", invoiceId)
-      .select("id, client, org, quote_ref, product, amount, gst, total, status, due, color, gstin, email, gst_rate, tax_type, discount, payment_terms, line_items")
-      .single()
-
-    if (error || !data) {
-      return NextResponse.json(
-        { error: error?.message ?? "Failed to update invoice." },
-        { status: 400 },
-      )
-    }
-
-    const invoice = mapInvoice(data as Record<string, unknown>)
-    return NextResponse.json({ invoice })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid update payload."
-    return NextResponse.json({ error: message }, { status: 400 })
-  }
-}
+// PATCH mutations were replaced by POST with an id field for updates.

@@ -234,12 +234,35 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const writeContext = await getSupabaseForWrite(request)
-    if (writeContext.error || !writeContext.supabase || !writeContext.userId) {
+    if (writeContext.error || !writeContext.supabase) {
       return writeContext.error!
     }
 
-    const body = (await request.json()) as Partial<CreateClientPayload>
-    const normalized = normalizeCreatePayload(body)
+    const body = (await request.json()) as Partial<CreateClientPayload> & Partial<UpdateClientPayload>
+    const clientId = readString(body.id)
+
+    if (clientId) {
+      const updateData = buildUpdateData(body as UpdateClientPayload)
+
+      if (Object.keys(updateData).length === 0) {
+        return NextResponse.json({ error: "No updatable fields were provided." }, { status: 400 })
+      }
+
+      const { data, error } = await writeContext.supabase
+        .from(CLIENTS_TABLE)
+        .update(updateData)
+        .eq("id", clientId)
+        .select("*")
+        .single()
+
+      if (error || !data) {
+        return NextResponse.json({ error: error?.message ?? "Failed to update client." }, { status: 400 })
+      }
+
+      return NextResponse.json({ client: mapClient(data as Record<string, unknown>) })
+    }
+
+    const normalized = normalizeCreatePayload(body as Partial<CreateClientPayload>)
 
     const insertData = {
       user_id: writeContext.userId,
@@ -274,39 +297,4 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
-  try {
-    const writeContext = await getSupabaseForWrite(request)
-    if (writeContext.error || !writeContext.supabase) {
-      return writeContext.error!
-    }
-
-    const body = (await request.json()) as UpdateClientPayload
-    const clientId = readString(body.id)
-
-    if (!clientId) {
-      return NextResponse.json({ error: "id is required." }, { status: 400 })
-    }
-
-    const updateData = buildUpdateData(body)
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ error: "No updatable fields were provided." }, { status: 400 })
-    }
-
-    const { data, error } = await writeContext.supabase
-      .from(CLIENTS_TABLE)
-      .update(updateData)
-      .eq("id", clientId)
-      .select("*")
-      .single()
-
-    if (error || !data) {
-      return NextResponse.json({ error: error?.message ?? "Failed to update client." }, { status: 400 })
-    }
-
-    return NextResponse.json({ client: mapClient(data as Record<string, unknown>) })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update client."
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
-}
+// PATCH mutations were replaced by POST with an id field for updates.

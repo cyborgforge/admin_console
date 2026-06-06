@@ -261,8 +261,35 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as Partial<CreateQuotationPayload>
-    const normalized = ensureCreatePayload(body)
+    const body = (await request.json()) as Partial<CreateQuotationPayload> & Partial<UpdateQuotationPayload>
+    const quotationId = readString(body.id)
+
+    if (quotationId) {
+      const updateData = buildUpdateData(body as UpdateQuotationPayload)
+
+      if (Object.keys(updateData).length === 0) {
+        return NextResponse.json({ error: "No updatable fields were provided." }, { status: 400 })
+      }
+
+      const { data, error } = await authResult.supabase
+        .from(QUOTATIONS_TABLE)
+        .update(updateData)
+        .eq("id", quotationId)
+        .select("*")
+        .single()
+
+      if (error || !data) {
+        return NextResponse.json(
+          { error: error?.message ?? "Failed to update quotation." },
+          { status: 400 },
+        )
+      }
+
+      const quotation = mapQuotation(data as Record<string, unknown>)
+      return NextResponse.json({ quotation })
+    }
+
+    const normalized = ensureCreatePayload(body as Partial<CreateQuotationPayload>)
 
     const insertData = {
       client: normalized.client,
@@ -300,44 +327,4 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
-  const authResult = await requireAuthenticatedRequest(request)
-  if (authResult.errorResponse || !authResult.supabase) {
-    return authResult.errorResponse!
-  }
-
-  try {
-    const body = (await request.json()) as UpdateQuotationPayload
-    const quotationId = readString(body.id)
-
-    if (!quotationId) {
-      return NextResponse.json({ error: "id is required." }, { status: 400 })
-    }
-
-    const updateData = buildUpdateData(body)
-
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ error: "No updatable fields were provided." }, { status: 400 })
-    }
-
-    const { data, error } = await authResult.supabase
-      .from(QUOTATIONS_TABLE)
-      .update(updateData)
-      .eq("id", quotationId)
-      .select("*")
-      .single()
-
-    if (error || !data) {
-      return NextResponse.json(
-        { error: error?.message ?? "Failed to update quotation." },
-        { status: 400 },
-      )
-    }
-
-    const quotation = mapQuotation(data as Record<string, unknown>)
-    return NextResponse.json({ quotation })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid update payload."
-    return NextResponse.json({ error: message }, { status: 400 })
-  }
-}
+// PATCH mutations were replaced by POST with an id field for updates.
