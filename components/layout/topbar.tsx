@@ -11,6 +11,7 @@ import { RecordPaymentDialog } from "../accounts/record-payment-dialog"
 const titles: Record<string, string> = {
   "/": "Dashboard",
   "/quotations": "Quotations",
+  "/leads":"Leads",
   "/clients": "Clients",
   "/invoices": "Invoices",
   "/subscriptions": "Subscriptions",
@@ -26,6 +27,7 @@ export function Topbar() {
   const isInvoices = pathname.startsWith("/invoices")
   const isSubscriptions = pathname.startsWith("/subscriptions")
   const isAccounts = pathname.startsWith("/accounts")
+  const isLeads=pathname.startsWith("/leads")
 
   return (
     <header className="topbar">
@@ -36,6 +38,8 @@ export function Topbar() {
         {isInvoices ? <NewInvoiceDialog triggerClassName="btn btn-primary" /> : null}
         {isSubscriptions ? <AddSubscriptionDialog triggerClassName="btn btn-primary" /> : null}
         {isAccounts ? <RecordPaymentDialog triggerClassName="btn btn-ghost" /> : null}
+        {isLeads? <RecordPaymentDialog triggerClassName="btn btn-ghost" /> : null}
+        
       </div>
     </header>
   )

@@ -20,6 +20,7 @@ import { useQuotations } from "@/hooks/use-quotations"
 
 const navMain = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
+  { href: "/leads", label: "Leads", icon: Landmark },
   { href: "/quotations", label: "Quotations", icon: FileText },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/invoices", label: "Invoices", icon: ReceiptText },
