@@ -184,7 +184,7 @@ function normalizeCreatePayload(
 }
 
 /**
- * GET /api/leads
+ * GET /api/leads && GET /api/leads?status=discovery|contacted|reviewing|closed-won|closed-lost
  */
 export async function GET(request: Request) {
   try {
@@ -193,20 +193,39 @@ export async function GET(request: Request) {
 
     if (
       authContext.errorResponse ||
-      !authContext.supabase ||
-      !authContext.userId
+      !authContext.supabase
     ) {
       return authContext.errorResponse!
     }
 
-    const { data, error } =
-      await authContext.supabase
-        .from(LEADS_TABLE)
-        .select("*")
-        .eq("created_by", authContext.userId)
-        .order("created_at", {
-          ascending: false,
-        })
+    const url = new URL(request.url)
+
+    const status = url.searchParams.get("status")
+
+    let query = authContext.supabase
+      .from(LEADS_TABLE)
+      .select("*")
+      // .eq("created_by", authContext.userId)
+
+    if (
+      status &&
+      [
+        "discovery",
+        "contacted",
+        "reviewing",
+        "closed-won",
+        "closed-lost",
+      ].includes(status)
+    ) {
+      query = query.eq("status", status)
+    }
+
+    const { data, error } = await query.order(
+      "created_at",
+      {
+        ascending: false,
+      }
+    )
 
     if (error) {
       return NextResponse.json(
@@ -220,6 +239,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
+      status: status ?? "all",
       leads: (data ?? []).map((row) =>
         mapLead(row as Record<string, unknown>)
       ),
@@ -283,7 +303,7 @@ export async function POST(request: Request) {
           tags: normalized.tags,
           product_interest:
             normalized.productInterest,
-          created_by: authContext.userId,
+          // created_by: authContext.userId,
         })
         .select()
         .single()

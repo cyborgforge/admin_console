@@ -242,7 +242,7 @@ export async function GET(
       .from(LEADS_TABLE)
       .select("*")
       .eq("id", id)
-      .eq("created_by", authContext.userId)
+      // .eq("created_by", authContext.userId)
       .single()
 
   if (error || !data) {
@@ -293,7 +293,7 @@ export async function PUT(
       .from(LEADS_TABLE)
       .update(updateData)
       .eq("id", id)
-      .eq("created_by", authContext.userId)
+      // .eq("created_by", authContext.userId)
       .select()
       .single()
 
@@ -337,7 +337,7 @@ export async function DELETE(
       .from(LEADS_TABLE)
       .delete()
       .eq("id", id)
-      .eq("created_by", authContext.userId)
+      // .eq("created_by", authContext.userId)
 
   if (error) {
     return NextResponse.json(
