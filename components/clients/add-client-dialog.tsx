@@ -39,8 +39,6 @@ export function AddClientDialog({
 }: AddClientDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const [name, setName] = useState("")
-  const [role, setRole] = useState("")
-  const [organization, setOrganization] = useState("")
   const [industry, setIndustry] = useState("Pharmacy")
   const [city, setCity] = useState("")
   const [email, setEmail] = useState("")
@@ -83,8 +81,6 @@ export function AddClientDialog({
 
   const resetForm = () => {
     setName("")
-    setRole("")
-    setOrganization("")
     setIndustry("Pharmacy")
     setCity("")
     setEmail("")
@@ -103,8 +99,6 @@ export function AddClientDialog({
     }
 
     setName(clientToEdit.name)
-    setRole(clientToEdit.role)
-    setOrganization(clientToEdit.organization)
     setIndustry(clientToEdit.industry)
     setCity(clientToEdit.city)
     setEmail(clientToEdit.email)
@@ -144,8 +138,8 @@ export function AddClientDialog({
     setPhoneTouched(true)
     setGstTouched(true)
 
-    if (!name.trim() || !organization.trim() || !email.trim()) {
-      toast.error("Name, organization and email are required.")
+    if (!name.trim() ||  !email.trim()) {
+      toast.error("Name and email are required.")
       return
     }
 
@@ -176,8 +170,6 @@ export function AddClientDialog({
       const payload = {
         ...(mode === "edit" && clientToEdit ? { id: clientToEdit.id } : {}),
         name: name.trim(),
-        role: role.trim() || "Owner",
-        organization: organization.trim(),
         industry,
         city: city.trim() || "Chennai",
         email: email.trim(),
@@ -264,13 +256,10 @@ export function AddClientDialog({
             <div className="section-heading">Contact info</div>
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">Contact name</label>
-                <Input className="form-input" placeholder="e.g. Ravi Kumar" value={name} onChange={(event) => setName(event.target.value)} />
+                <label className="form-label"> Name</label>
+                <Input className="form-input" placeholder="e.g. Appolo pharmacy" value={name} onChange={(event) => setName(event.target.value)} />
               </div>
-              <div className="form-group">
-                <label className="form-label">Role / Designation</label>
-                <Input className="form-input" placeholder="e.g. Procurement Head" value={role} onChange={(event) => setRole(event.target.value)} />
-              </div>
+              
             </div>
             <div className="form-row" style={{ marginTop: "10px" }}>
               <div className="form-group">
@@ -315,23 +304,7 @@ export function AddClientDialog({
             </div>
           </div>
 
-          <div>
-            <div className="section-heading">Organisation</div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Organisation name</label>
-                <Input className="form-input" placeholder="Company / Hospital name" value={organization} onChange={(event) => setOrganization(event.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Industry</label>
-                <select className="form-input" value={industry} onChange={(event) => setIndustry(event.target.value)}>
-                  <option value="Pharmacy">Pharmacy</option>
-                  <option value="Clinic">Healthcare / Clinic</option>
-                  <option value="Retail">Retail</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
+         
             <div className="form-row" style={{ marginTop: "10px" }}>
               <div className="form-group">
                 <label className="form-label">City</label>
@@ -359,7 +332,7 @@ export function AddClientDialog({
                 ) : null}
               </div>
             </div>
-          </div>
+          
 
           <div>
             <div className="section-heading">Interested in</div>

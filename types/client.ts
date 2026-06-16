@@ -4,7 +4,7 @@ export type Client = {
   id: string
   name: string
   role: string
-  organization: string
+ 
   industry: string
   city: string
   email: string
@@ -22,7 +22,6 @@ export type Client = {
 export type CreateClientPayload = {
   name: string
   role: string
-  organization: string
   industry: string
   city: string
   email: string
@@ -38,7 +37,6 @@ export type UpdateClientPayload = {
   id: string
   name?: string
   role?: string
-  organization?: string
   industry?: string
   city?: string
   email?: string
