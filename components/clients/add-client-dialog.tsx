@@ -190,14 +190,19 @@ export function AddClientDialog({
           .join("\n"),
       }
 
-      const response = await fetch("/api/clients", {
-        method: mode === "edit" ? "PATCH" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const response = await fetch(
+        mode === "edit" && clientToEdit
+          ? `/api/clients/${clientToEdit.id}`
+          : "/api/clients",
+        {
+          method: mode === "edit" ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      })
+      )
 
       if (!response.ok) {
         const responseData = (await response.json()) as { error?: string }

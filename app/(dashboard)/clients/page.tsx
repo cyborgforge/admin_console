@@ -35,8 +35,8 @@ type ClientChangedDetail = {
 
 const clientStatusLabel: Record<Client["status"], string> = {
   active: "Active",
+  inactive: "Inactive",
   prospect: "Prospect",
-  churned: "Churned",
 }
 
 function clientStatusBadgeClass(status: Client["status"]) {
@@ -188,7 +188,7 @@ export default function ClientsPage() {
           <option value="">All status</option>
           <option value="active">Active</option>
           <option value="prospect">Prospect</option>
-          <option value="churned">Churned</option>
+          <option value="inactive">Inactive</option>
         </select>
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
           <button type="button" className="icon-btn" onClick={() => setView("grid")} style={view === "grid" ? { width: "32px", height: "32px", background: "var(--accent-dim)", color: "var(--accent)" } : { width: "32px", height: "32px" }}>

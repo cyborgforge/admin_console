@@ -6,8 +6,8 @@ function clientBadgeClass(status: Client["status"]) {
 
 const labels: Record<Client["status"], string> = {
   active: "Active",
+  inactive: "Inactive",
   prospect: "Prospect",
-  churned: "Churned",
 }
 
 export function ClientCard({

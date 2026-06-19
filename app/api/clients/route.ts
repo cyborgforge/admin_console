@@ -1,300 +1,264 @@
 import { NextResponse } from "next/server"
 
 import { getSupabaseServerClient } from "@/lib/supabaseServer"
-import type { Client, ClientStatus, CreateClientPayload, UpdateClientPayload } from "@/types/client"
 
-const CLIENTS_TABLE = process.env.SUPABASE_CLIENTS_TABLE ?? "clients"
+const CLIENTS_TABLE =
+  process.env.SUPABASE_CLIENTS_TABLE ?? "clients"
 
-function isClientStatus(value: unknown): value is ClientStatus {
-  return value === "active" || value === "prospect" || value === "churned"
+type ClientStatus =
+  | "active"
+  | "inactive"
+  | "prospect"
+
+type ClientPayload = {
+  company_name?: unknown
+  industry?: unknown
+  website?: unknown
+  gst_number?: unknown
+  company_size?: unknown
+  email?: unknown
+  phone?: unknown
+  address_line_1?: unknown
+  city?: unknown
+  state?: unknown
+  country?: unknown
+  postal_code?: unknown
+  status?: unknown
 }
 
-function readString(value: unknown, fallback = "") {
-  return typeof value === "string" ? value.trim() : fallback
+function isClientStatus(
+  value: unknown
+): value is ClientStatus {
+  return (
+    value === "active" ||
+    value === "inactive" ||
+    value === "prospect"
+  )
 }
 
-function readNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) {
-      return parsed
-    }
-  }
-
-  return fallback
+function readString(value: unknown) {
+  return typeof value === "string"
+    ? value.trim()
+    : ""
 }
 
-function mapClient(row: Record<string, unknown>): Client {
-  const rawStatus = row.status
-  const status = isClientStatus(rawStatus) ? rawStatus : "prospect"
+function readNullableString(value: unknown) {
+  const trimmed = readString(value)
 
-  const totalBilledSource =
-    row.total_billed ??
-    row.totalBilled ??
-    row.totalbilled
-
-  const quotesSource =
-    row.quotes_count ??
-    row.quotes ??
-    row.quotesCount
-
-  const sinceSource =
-    row.since_label ??
-    row.since ??
-    row.sinceLabel
-
-  return {
-    id: readString(row.id) || `CL-${Date.now()}`,
-    name: readString(row.name, "New Client"),
-    role: readString(row.role, "Owner"),
-    organization: readString(row.organization, "New Organization"),
-    industry: readString(row.industry, "Pharmacy"),
-    city: readString(row.city, "Chennai"),
-    email: readString(row.email, "client@example.com"),
-    phone: readString(row.phone, "+91 90000 00000"),
-    status,
-    product: readString(row.product, "Pharmacy Suite"),
-    totalBilled: readNumber(totalBilledSource, 0),
-    quotes: readNumber(quotesSource, 0),
-    since: readString(sinceSource, "Mar 2026"),
-    color: readString(row.color, "#3b82f6"),
-    gst: readString(row.gst, "-"),
-    notes: readString(row.notes),
-  }
+  return trimmed || null
 }
 
 function getAccessToken(request: Request) {
-  const authHeader = request.headers.get("authorization")
+  const authHeader =
+    request.headers.get("authorization")
+
   if (!authHeader?.startsWith("Bearer ")) {
     return null
   }
 
-  return authHeader.slice(7).trim() || null
+  return authHeader.slice(7).trim()
 }
 
-async function getSupabaseForWrite(request: Request) {
+async function requireAuthenticatedRequest(
+  request: Request
+) {
   const accessToken = getAccessToken(request)
+
   if (!accessToken) {
     return {
-      error: NextResponse.json({ error: "Missing access token." }, { status: 401 }),
+      errorResponse: NextResponse.json(
+        { error: "Missing access token." },
+        { status: 401 }
+      ),
       supabase: null,
       userId: null,
     }
   }
 
-  const supabase = getSupabaseServerClient(accessToken)
+  const supabase =
+    getSupabaseServerClient(accessToken)
 
-  const { data, error } = await supabase.auth.getUser(accessToken)
+  const { data, error } =
+    await supabase.auth.getUser(accessToken)
+
   if (error || !data.user) {
     return {
-      error: NextResponse.json({ error: "Invalid or expired session." }, { status: 401 }),
+      errorResponse: NextResponse.json(
+        { error: "Invalid or expired session." },
+        { status: 401 }
+      ),
       supabase: null,
       userId: null,
     }
-  }
-
-  return { error: null, supabase, userId: data.user.id }
-}
-
-function normalizeCreatePayload(payload: Partial<CreateClientPayload>) {
-  const name = readString(payload.name)
-  const organization = readString(payload.organization)
-  const product = readString(payload.product)
-  const email = readString(payload.email)
-
-  if (!name || !organization || !product || !email) {
-    throw new Error("name, organization, product and email are required.")
   }
 
   return {
-    name,
-    role: readString(payload.role, "Owner"),
-    organization,
-    industry: readString(payload.industry, "Pharmacy"),
-    city: readString(payload.city, "Chennai"),
-    email,
-    phone: readString(payload.phone, "+91 90000 00000"),
-    status: isClientStatus(payload.status) ? payload.status : "prospect",
-    product,
-    color: readString(payload.color, "#3b82f6"),
-    gst: readString(payload.gst, "-"),
-    notes: readString(payload.notes),
+    errorResponse: null,
+    supabase,
+    userId: data.user.id,
   }
 }
 
-function buildUpdateData(payload: UpdateClientPayload) {
-  const updateData: Record<string, unknown> = {}
+function normalizeCreatePayload(
+  payload: ClientPayload,
+  userId: string
+) {
+  const companyName = readString(
+    payload.company_name
+  )
 
-  if (typeof payload.name === "string") {
-    const value = payload.name.trim()
-    if (value) {
-      updateData.name = value
-    }
+  if (!companyName) {
+    throw new Error("company_name is required.")
   }
 
-  if (typeof payload.role === "string") {
-    const value = payload.role.trim()
-    if (value) {
-      updateData.role = value
-    }
+  if (
+    payload.status !== undefined &&
+    !isClientStatus(payload.status)
+  ) {
+    throw new Error(
+      "status must be active, inactive, or prospect."
+    )
   }
 
-  if (typeof payload.organization === "string") {
-    const value = payload.organization.trim()
-    if (value) {
-      updateData.organization = value
-    }
+  return {
+    company_name: companyName,
+    industry: readNullableString(
+      payload.industry
+    ),
+    website: readNullableString(
+      payload.website
+    ),
+    gst_number: readNullableString(
+      payload.gst_number
+    ),
+    company_size: readNullableString(
+      payload.company_size
+    ),
+    email: readNullableString(payload.email),
+    phone: readNullableString(payload.phone),
+    address_line_1: readNullableString(
+      payload.address_line_1
+    ),
+    city: readNullableString(payload.city),
+    state: readNullableString(payload.state),
+    country: readNullableString(
+      payload.country
+    ),
+    postal_code: readNullableString(
+      payload.postal_code
+    ),
+    status: isClientStatus(payload.status)
+      ? payload.status
+      : "active",
+    created_by: userId,
   }
-
-  if (typeof payload.industry === "string") {
-    const value = payload.industry.trim()
-    if (value) {
-      updateData.industry = value
-    }
-  }
-
-  if (typeof payload.city === "string") {
-    const value = payload.city.trim()
-    if (value) {
-      updateData.city = value
-    }
-  }
-
-  if (typeof payload.email === "string") {
-    const value = payload.email.trim()
-    if (value) {
-      updateData.email = value
-    }
-  }
-
-  if (typeof payload.phone === "string") {
-    const value = payload.phone.trim()
-    if (value) {
-      updateData.phone = value
-    }
-  }
-
-  if (payload.status && isClientStatus(payload.status)) {
-    updateData.status = payload.status
-  }
-
-  if (typeof payload.product === "string") {
-    const value = payload.product.trim()
-    if (value) {
-      updateData.product = value
-    }
-  }
-
-  if (typeof payload.color === "string") {
-    const value = payload.color.trim()
-    if (value) {
-      updateData.color = value
-    }
-  }
-
-  if (typeof payload.gst === "string") {
-    updateData.gst = payload.gst.trim() || "-"
-  }
-
-  if (typeof payload.notes === "string") {
-    updateData.notes = payload.notes.trim()
-  }
-
-  return updateData
 }
 
+/**
+ * GET /api/clients
+ */
 export async function GET(request: Request) {
   try {
-    const authContext = await getSupabaseForWrite(request)
-    if (authContext.error || !authContext.supabase) {
-      return authContext.error!
+    const authContext =
+      await requireAuthenticatedRequest(request)
+
+    if (
+      authContext.errorResponse ||
+      !authContext.supabase
+    ) {
+      return authContext.errorResponse!
     }
 
-    const { data, error } = await authContext.supabase
-      .from(CLIENTS_TABLE)
-      .select("*")
-      .order("created_at", { ascending: false })
+    const { data, error } =
+      await authContext.supabase
+        .from(CLIENTS_TABLE)
+        .select("*")
+        .order("created_at", {
+          ascending: false,
+        })
 
     if (error) {
-      return NextResponse.json({ error: error.message ?? "Failed to read clients." }, { status: 400 })
+      return NextResponse.json(
+        {
+          error:
+            error.message ??
+            "Failed to fetch clients.",
+        },
+        { status: 400 }
+      )
     }
 
-    const clients = (data ?? []).map((row) => mapClient(row as Record<string, unknown>))
-    return NextResponse.json({ clients, source: "supabase" })
+    return NextResponse.json({
+      clients: data ?? [],
+    })
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to read clients."
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch clients.",
+      },
+      { status: 500 }
+    )
   }
 }
 
+/**
+ * POST /api/clients
+ */
 export async function POST(request: Request) {
   try {
-    const writeContext = await getSupabaseForWrite(request)
-    if (writeContext.error || !writeContext.supabase) {
-      return writeContext.error!
+    const authContext =
+      await requireAuthenticatedRequest(request)
+
+    if (
+      authContext.errorResponse ||
+      !authContext.supabase ||
+      !authContext.userId
+    ) {
+      return authContext.errorResponse!
     }
 
-    const body = (await request.json()) as Partial<CreateClientPayload> & Partial<UpdateClientPayload>
-    const clientId = readString(body.id)
+    const body =
+      (await request.json()) as ClientPayload
 
-    if (clientId) {
-      const updateData = buildUpdateData(body as UpdateClientPayload)
+    const payload = normalizeCreatePayload(
+      body,
+      authContext.userId
+    )
 
-      if (Object.keys(updateData).length === 0) {
-        return NextResponse.json({ error: "No updatable fields were provided." }, { status: 400 })
-      }
-
-      const { data, error } = await writeContext.supabase
+    const { data, error } =
+      await authContext.supabase
         .from(CLIENTS_TABLE)
-        .update(updateData)
-        .eq("id", clientId)
-        .select("*")
+        .insert(payload)
+        .select()
         .single()
 
-      if (error || !data) {
-        return NextResponse.json({ error: error?.message ?? "Failed to update client." }, { status: 400 })
-      }
-
-      return NextResponse.json({ client: mapClient(data as Record<string, unknown>) })
+    if (error || !data) {
+      return NextResponse.json(
+        {
+          error:
+            error?.message ??
+            "Failed to create client.",
+        },
+        { status: 400 }
+      )
     }
 
-    const normalized = normalizeCreatePayload(body as Partial<CreateClientPayload>)
-
-    const insertData = {
-      user_id: writeContext.userId,
-      name: normalized.name,
-      role: normalized.role,
-      organization: normalized.organization,
-      industry: normalized.industry,
-      city: normalized.city,
-      email: normalized.email,
-      phone: normalized.phone,
-      status: normalized.status,
-      product: normalized.product,
-      color: normalized.color,
-      gst: normalized.gst,
-      notes: normalized.notes,
-    }
-
-    const { data, error } = await writeContext.supabase
-      .from(CLIENTS_TABLE)
-      .insert(insertData)
-      .select("*")
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: error.message ?? "Failed to create client." }, { status: 400 })
-    }
-
-    return NextResponse.json({ client: mapClient(data as Record<string, unknown>) }, { status: 201 })
+    return NextResponse.json(
+      { client: data },
+      { status: 201 }
+    )
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create client."
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Invalid payload.",
+      },
+      { status: 400 }
+    )
   }
 }
-
-// PATCH mutations were replaced by POST with an id field for updates.
