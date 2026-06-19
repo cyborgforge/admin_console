@@ -29,6 +29,19 @@ function readNullableString(value: unknown) {
   return trimmed || null
 }
 
+function readRequiredUuid(
+  value: unknown,
+  fieldName: string
+) {
+  const trimmed = readString(value)
+
+  if (!trimmed) {
+    throw new Error(`${fieldName} cannot be empty.`)
+  }
+
+  return trimmed
+}
+
 function getAccessToken(request: Request) {
   const authHeader =
     request.headers.get("authorization")
@@ -83,15 +96,10 @@ function buildUpdateData(
   const updateData: Record<string, unknown> = {}
 
   if (payload.client_id !== undefined) {
-    const client_id = readString(
-      payload.client_id
+    const client_id = readRequiredUuid(
+      payload.client_id,
+      "client_id"
     )
-
-    if (!client_id) {
-      throw new Error(
-        "client_id cannot be empty."
-      )
-    }
 
     updateData.client_id = client_id
   }
@@ -148,6 +156,27 @@ function buildUpdateData(
   }
 
   return updateData
+}
+
+async function requireRecordExists(
+  supabase: NonNullable<
+    Awaited<
+      ReturnType<typeof requireAuthenticatedRequest>
+    >["supabase"]
+  >,
+  table: string,
+  id: string,
+  fieldName: string
+) {
+  const { data, error } = await supabase
+    .from(table)
+    .select("id")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (error || !data) {
+    throw new Error(`${fieldName} does not exist.`)
+  }
 }
 
 /**
@@ -228,6 +257,15 @@ export async function PUT(
             "No fields provided for update.",
         },
         { status: 400 }
+      )
+    }
+
+    if (typeof updateData.client_id === "string") {
+      await requireRecordExists(
+        authContext.supabase,
+        "clients",
+        updateData.client_id,
+        "client_id"
       )
     }
 

@@ -29,6 +29,19 @@ function readNullableString(value: unknown) {
   return trimmed || null
 }
 
+function readRequiredUuid(
+  value: unknown,
+  fieldName: string
+) {
+  const trimmed = readString(value)
+
+  if (!trimmed) {
+    throw new Error(`${fieldName} is required.`)
+  }
+
+  return trimmed
+}
+
 function getAccessToken(request: Request) {
   const authHeader =
     request.headers.get("authorization")
@@ -84,14 +97,13 @@ function normalizeCreatePayload(
   payload: BranchPayload,
   userId: string
 ) {
-  const client_id = readString(payload.client_id)
+  const client_id = readRequiredUuid(
+    payload.client_id,
+    "client_id"
+  )
   const branch_name = readString(
     payload.branch_name
   )
-
-  if (!client_id) {
-    throw new Error("client_id is required.")
-  }
 
   if (!branch_name) {
     throw new Error("branch_name is required.")
@@ -114,6 +126,27 @@ function normalizeCreatePayload(
       payload.postal_code
     ),
     created_by: userId,
+  }
+}
+
+async function requireRecordExists(
+  supabase: NonNullable<
+    Awaited<
+      ReturnType<typeof requireAuthenticatedRequest>
+    >["supabase"]
+  >,
+  table: string,
+  id: string,
+  fieldName: string
+) {
+  const { data, error } = await supabase
+    .from(table)
+    .select("id")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (error || !data) {
+    throw new Error(`${fieldName} does not exist.`)
   }
 }
 
@@ -198,6 +231,13 @@ export async function POST(request: Request) {
     const payload = normalizeCreatePayload(
       body,
       authContext.userId
+    )
+
+    await requireRecordExists(
+      authContext.supabase,
+      "clients",
+      payload.client_id,
+      "client_id"
     )
 
     const { data, error } =

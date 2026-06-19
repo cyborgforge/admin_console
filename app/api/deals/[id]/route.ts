@@ -2,19 +2,45 @@ import { NextResponse } from "next/server"
 
 import { getSupabaseServerClient } from "@/lib/supabaseServer"
 
-const CONTACTS_TABLE =
-  process.env.SUPABASE_CONTACTS_TABLE ?? "contacts"
+const DEALS_TABLE =
+  process.env.SUPABASE_DEALS_TABLE ?? "deals"
 
-type ContactUpdatePayload = {
-  name?: unknown
-  designation?: unknown
-  department?: unknown
-  email?: unknown
-  mobile?: unknown
-  phone?: unknown
-  linkedin?: unknown
+type DealStage =
+  | "new"
+  | "quote sent"
+  | "negotiation"
+  | "reviewing"
+  | "hold"
+  | "won"
+  | "lost"
+
+type DealUpdatePayload = {
+  deal_name?: unknown
   client_id?: unknown
   branch_id?: unknown
+  primary_contact_id?: unknown
+  stage?: unknown
+  expected_value?: unknown
+  source_lead_id?: unknown
+  assigned_to?: unknown
+  description?: unknown
+  current_quotation_id?: unknown
+  lost_reason?: unknown
+  won_date?: unknown
+}
+
+function isDealStage(
+  value: unknown
+): value is DealStage {
+  return (
+    value === "new" ||
+    value === "quote sent" ||
+    value === "negotiation" ||
+    value === "reviewing" ||
+    value === "hold" ||
+    value === "won" ||
+    value === "lost"
+  )
 }
 
 function readString(value: unknown) {
@@ -40,6 +66,22 @@ function readRequiredUuid(
   }
 
   return trimmed
+}
+
+function readNullableNumber(value: unknown) {
+  if (value === undefined || value === null) {
+    return null
+  }
+
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed)) {
+    throw new Error(
+      "expected_value must be a valid number."
+    )
+  }
+
+  return parsed
 }
 
 function getAccessToken(request: Request) {
@@ -91,48 +133,22 @@ async function requireAuthenticatedRequest(
 }
 
 function buildUpdateData(
-  payload: ContactUpdatePayload
+  payload: DealUpdatePayload
 ) {
   const updateData: Record<string, unknown> = {}
 
-  if (payload.name !== undefined) {
-    const name = readString(payload.name)
+  if (payload.deal_name !== undefined) {
+    const deal_name = readString(
+      payload.deal_name
+    )
 
-    if (!name) {
-      throw new Error("name cannot be empty.")
+    if (!deal_name) {
+      throw new Error(
+        "deal_name cannot be empty."
+      )
     }
 
-    updateData.name = name
-  }
-
-  if (payload.designation !== undefined) {
-    updateData.designation =
-      readNullableString(payload.designation)
-  }
-
-  if (payload.department !== undefined) {
-    updateData.department =
-      readNullableString(payload.department)
-  }
-
-  if (payload.email !== undefined) {
-    updateData.email =
-      readNullableString(payload.email)
-  }
-
-  if (payload.mobile !== undefined) {
-    updateData.mobile =
-      readNullableString(payload.mobile)
-  }
-
-  if (payload.phone !== undefined) {
-    updateData.phone =
-      readNullableString(payload.phone)
-  }
-
-  if (payload.linkedin !== undefined) {
-    updateData.linkedin =
-      readNullableString(payload.linkedin)
+    updateData.deal_name = deal_name
   }
 
   if (payload.client_id !== undefined) {
@@ -151,6 +167,66 @@ function buildUpdateData(
     )
 
     updateData.branch_id = branch_id
+  }
+
+  if (payload.primary_contact_id !== undefined) {
+    updateData.primary_contact_id =
+      readNullableString(
+        payload.primary_contact_id
+      )
+  }
+
+  if (payload.stage !== undefined) {
+    if (!isDealStage(payload.stage)) {
+      throw new Error(
+        "stage must be new, quote sent, negotiation, reviewing, hold, won, or lost."
+      )
+    }
+
+    updateData.stage = payload.stage
+  }
+
+  if (payload.expected_value !== undefined) {
+    updateData.expected_value =
+      readNullableNumber(
+        payload.expected_value
+      )
+  }
+
+  if (payload.source_lead_id !== undefined) {
+    updateData.source_lead_id =
+      readNullableString(
+        payload.source_lead_id
+      )
+  }
+
+  if (payload.assigned_to !== undefined) {
+    updateData.assigned_to =
+      readNullableString(payload.assigned_to)
+  }
+
+  if (payload.description !== undefined) {
+    updateData.description =
+      readNullableString(payload.description)
+  }
+
+  if (
+    payload.current_quotation_id !== undefined
+  ) {
+    updateData.current_quotation_id =
+      readNullableString(
+        payload.current_quotation_id
+      )
+  }
+
+  if (payload.lost_reason !== undefined) {
+    updateData.lost_reason =
+      readNullableString(payload.lost_reason)
+  }
+
+  if (payload.won_date !== undefined) {
+    updateData.won_date =
+      readNullableString(payload.won_date)
   }
 
   return updateData
@@ -177,8 +253,68 @@ async function requireRecordExists(
   }
 }
 
+async function validateDealReferences(
+  supabase: NonNullable<
+    Awaited<
+      ReturnType<typeof requireAuthenticatedRequest>
+    >["supabase"]
+  >,
+  payload: Record<string, unknown>
+) {
+  if (typeof payload.client_id === "string") {
+    await requireRecordExists(
+      supabase,
+      "clients",
+      payload.client_id,
+      "client_id"
+    )
+  }
+
+  if (typeof payload.branch_id === "string") {
+    await requireRecordExists(
+      supabase,
+      "branches",
+      payload.branch_id,
+      "branch_id"
+    )
+  }
+
+  if (
+    typeof payload.primary_contact_id ===
+    "string"
+  ) {
+    await requireRecordExists(
+      supabase,
+      "contacts",
+      payload.primary_contact_id,
+      "primary_contact_id"
+    )
+  }
+
+  if (typeof payload.source_lead_id === "string") {
+    await requireRecordExists(
+      supabase,
+      "leads",
+      payload.source_lead_id,
+      "source_lead_id"
+    )
+  }
+
+  if (
+    typeof payload.current_quotation_id ===
+    "string"
+  ) {
+    await requireRecordExists(
+      supabase,
+      "quotations",
+      payload.current_quotation_id,
+      "current_quotation_id"
+    )
+  }
+}
+
 /**
- * GET /api/contacts/:id
+ * GET /api/deals/:id
  */
 export async function GET(
   request: Request,
@@ -202,25 +338,25 @@ export async function GET(
 
   const { data, error } =
     await authContext.supabase
-      .from(CONTACTS_TABLE)
+      .from(DEALS_TABLE)
       .select("*")
       .eq("id", id)
       .single()
 
   if (error || !data) {
     return NextResponse.json(
-      { error: "Contact not found." },
+      { error: "Deal not found." },
       { status: 404 }
     )
   }
 
   return NextResponse.json({
-    contact: data,
+    deal: data,
   })
 }
 
 /**
- * PUT /api/contacts/:id
+ * PUT /api/deals/:id
  */
 export async function PUT(
   request: Request,
@@ -244,7 +380,7 @@ export async function PUT(
     }
 
     const body =
-      (await request.json()) as ContactUpdatePayload
+      (await request.json()) as DealUpdatePayload
 
     const updateData = buildUpdateData(body)
 
@@ -258,27 +394,14 @@ export async function PUT(
       )
     }
 
-    if (typeof updateData.client_id === "string") {
-      await requireRecordExists(
-        authContext.supabase,
-        "clients",
-        updateData.client_id,
-        "client_id"
-      )
-    }
-
-    if (typeof updateData.branch_id === "string") {
-      await requireRecordExists(
-        authContext.supabase,
-        "branches",
-        updateData.branch_id,
-        "branch_id"
-      )
-    }
+    await validateDealReferences(
+      authContext.supabase,
+      updateData
+    )
 
     const { data, error } =
       await authContext.supabase
-        .from(CONTACTS_TABLE)
+        .from(DEALS_TABLE)
         .update(updateData)
         .eq("id", id)
         .select()
@@ -289,14 +412,14 @@ export async function PUT(
         {
           error:
             error?.message ??
-            "Failed to update contact.",
+            "Failed to update deal.",
         },
         { status: 400 }
       )
     }
 
     return NextResponse.json({
-      contact: data,
+      deal: data,
     })
   } catch (error) {
     return NextResponse.json(
@@ -312,7 +435,7 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/contacts/:id
+ * DELETE /api/deals/:id
  */
 export async function DELETE(
   request: Request,
@@ -336,7 +459,7 @@ export async function DELETE(
 
   const { error } =
     await authContext.supabase
-      .from(CONTACTS_TABLE)
+      .from(DEALS_TABLE)
       .delete()
       .eq("id", id)
 
@@ -345,7 +468,7 @@ export async function DELETE(
       {
         error:
           error.message ??
-          "Failed to delete contact.",
+          "Failed to delete deal.",
       },
       { status: 400 }
     )

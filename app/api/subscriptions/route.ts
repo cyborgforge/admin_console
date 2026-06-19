@@ -2,44 +2,69 @@ import { NextResponse } from "next/server"
 
 import { getSupabaseServerClient } from "@/lib/supabaseServer"
 
-const QUOTATIONS_TABLE =
-  process.env.SUPABASE_QUOTATIONS_TABLE ??
-  "quotations"
+const SUBSCRIPTIONS_TABLE =
+  process.env.SUPABASE_SUBSCRIPTIONS_TABLE ??
+  "subscriptions"
 
-type QuotationStatus =
-  | "draft"
-  | "sent"
-  | "accepted"
-  | "rejected"
-  | "expired"
+type SubscriptionStatus =
+  | "active"
+  | "expiring"
+  | "churned"
+  | "cancelled"
+  | "paused"
 
-type QuotationPayload = {
-  deal_id?: unknown
+type BillingCycle =
+  | "monthly"
+  | "quarterly"
+  | "annual"
+
+type Plan =
+  | "starter"
+  | "growth"
+  | "enterprise"
+
+type SubscriptionPayload = {
   client_id?: unknown
-  branch_id?: unknown
-  contact_id?: unknown
+  deal_id?: unknown
+  quotation_id?: unknown
   product_module_id?: unknown
   product_service_id?: unknown
-  quotation_date?: unknown
-  valid_until?: unknown
+  plan?: unknown
+  billing_cycle?: unknown
+  mrr?: unknown
+  start_date?: unknown
+  renewal_date?: unknown
   status?: unknown
-  subtotal_amount?: unknown
-  discount_amount?: unknown
-  tax_amount?: unknown
-  total_amount?: unknown
-  currency?: unknown
   notes?: unknown
 }
 
-function isQuotationStatus(
+function isSubscriptionStatus(
   value: unknown
-): value is QuotationStatus {
+): value is SubscriptionStatus {
   return (
-    value === "draft" ||
-    value === "sent" ||
-    value === "accepted" ||
-    value === "rejected" ||
-    value === "expired"
+    value === "active" ||
+    value === "expiring" ||
+    value === "churned" ||
+    value === "cancelled" ||
+    value === "paused"
+  )
+}
+
+function isBillingCycle(
+  value: unknown
+): value is BillingCycle {
+  return (
+    value === "monthly" ||
+    value === "quarterly" ||
+    value === "annual"
+  )
+}
+
+function isPlan(value: unknown): value is Plan {
+  return (
+    value === "starter" ||
+    value === "growth" ||
+    value === "enterprise"
   )
 }
 
@@ -85,17 +110,6 @@ function readNullableNumber(
   }
 
   return parsed
-}
-
-function generateQuotationNumber() {
-  const year = new Date().getFullYear()
-  const suffix = crypto
-    .randomUUID()
-    .replace(/-/g, "")
-    .slice(0, 8)
-    .toUpperCase()
-
-  return `QTN-${year}-${suffix}`
 }
 
 function getAccessToken(request: Request) {
@@ -170,7 +184,7 @@ async function requireRecordExists(
   }
 }
 
-async function validateQuotationReferences(
+async function validateSubscriptionReferences(
   supabase: NonNullable<
     Awaited<
       ReturnType<typeof requireAuthenticatedRequest>
@@ -196,21 +210,12 @@ async function validateQuotationReferences(
     )
   }
 
-  if (typeof payload.branch_id === "string") {
+  if (typeof payload.quotation_id === "string") {
     await requireRecordExists(
       supabase,
-      "branches",
-      payload.branch_id,
-      "branch_id"
-    )
-  }
-
-  if (typeof payload.contact_id === "string") {
-    await requireRecordExists(
-      supabase,
-      "contacts",
-      payload.contact_id,
-      "contact_id"
+      "quotations",
+      payload.quotation_id,
+      "quotation_id"
     )
   }
 
@@ -241,40 +246,53 @@ function validateSearchParams(
   searchParams: URLSearchParams
 ) {
   const allowedParams = new Set([
-    "quotation_number",
-    "deal_id",
     "client_id",
-    "branch_id",
-    "contact_id",
+    "deal_id",
+    "quotation_id",
     "product_module_id",
     "product_service_id",
+    "plan",
+    "billing_cycle",
     "status",
   ])
 
   for (const key of searchParams.keys()) {
     if (!allowedParams.has(key)) {
-      const hint =
-        key === "deals_id"
-          ? " Use deal_id instead."
-          : ""
-
       throw new Error(
-        `Unsupported query parameter: ${key}.${hint}`
+        `Unsupported query parameter: ${key}.`
       )
     }
   }
 
   const status = searchParams.get("status")
+  const billing_cycle =
+    searchParams.get("billing_cycle")
+  const plan = searchParams.get("plan")
 
-  if (status && !isQuotationStatus(status)) {
+  if (status && !isSubscriptionStatus(status)) {
     throw new Error(
-      "status must be draft, sent, accepted, rejected, or expired."
+      "status must be active, expiring, churned, cancelled, or paused."
+    )
+  }
+
+  if (
+    billing_cycle &&
+    !isBillingCycle(billing_cycle)
+  ) {
+    throw new Error(
+      "billing_cycle must be monthly, quarterly, or annual."
+    )
+  }
+
+  if (plan && !isPlan(plan)) {
+    throw new Error(
+      "plan must be starter, growth, or enterprise."
     )
   }
 }
 
 function normalizeCreatePayload(
-  payload: QuotationPayload,
+  payload: SubscriptionPayload,
   userId: string
 ) {
   const client_id = readRequiredUuid(
@@ -284,24 +302,38 @@ function normalizeCreatePayload(
 
   if (
     payload.status !== undefined &&
-    !isQuotationStatus(payload.status)
+    !isSubscriptionStatus(payload.status)
   ) {
     throw new Error(
-      "status must be draft, sent, accepted, rejected, or expired."
+      "status must be active, expiring, churned, cancelled, or paused."
+    )
+  }
+
+  if (
+    payload.billing_cycle !== undefined &&
+    !isBillingCycle(payload.billing_cycle)
+  ) {
+    throw new Error(
+      "billing_cycle must be monthly, quarterly, or annual."
+    )
+  }
+
+  if (
+    payload.plan !== undefined &&
+    !isPlan(payload.plan)
+  ) {
+    throw new Error(
+      "plan must be starter, growth, or enterprise."
     )
   }
 
   return {
-    quotation_number: generateQuotationNumber(),
+    client_id,
     deal_id: readNullableString(
       payload.deal_id
     ),
-    client_id,
-    branch_id: readNullableString(
-      payload.branch_id
-    ),
-    contact_id: readNullableString(
-      payload.contact_id
+    quotation_id: readNullableString(
+      payload.quotation_id
     ),
     product_module_id: readNullableString(
       payload.product_module_id
@@ -309,39 +341,31 @@ function normalizeCreatePayload(
     product_service_id: readNullableString(
       payload.product_service_id
     ),
-    quotation_date: readNullableString(
-      payload.quotation_date
+    plan: isPlan(payload.plan)
+      ? payload.plan
+      : null,
+    billing_cycle: isBillingCycle(
+      payload.billing_cycle
+    )
+      ? payload.billing_cycle
+      : null,
+    mrr: readNullableNumber(payload.mrr, "mrr"),
+    start_date: readNullableString(
+      payload.start_date
     ),
-    valid_until: readNullableString(
-      payload.valid_until
+    renewal_date: readNullableString(
+      payload.renewal_date
     ),
-    status: isQuotationStatus(payload.status)
+    status: isSubscriptionStatus(payload.status)
       ? payload.status
-      : "draft",
-    subtotal_amount: readNullableNumber(
-      payload.subtotal_amount,
-      "subtotal_amount"
-    ),
-    discount_amount: readNullableNumber(
-      payload.discount_amount,
-      "discount_amount"
-    ),
-    tax_amount: readNullableNumber(
-      payload.tax_amount,
-      "tax_amount"
-    ),
-    total_amount: readNullableNumber(
-      payload.total_amount,
-      "total_amount"
-    ),
-    currency: readString(payload.currency) || "USD",
+      : "active",
     notes: readNullableString(payload.notes),
     created_by: userId,
   }
 }
 
 /**
- * GET /api/quotations
+ * GET /api/subscriptions
  */
 export async function GET(request: Request) {
   try {
@@ -358,66 +382,16 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     validateSearchParams(url.searchParams)
 
-    const quotation_number = url.searchParams.get(
-      "quotation_number"
-    )
-    const deal_id =
-      url.searchParams.get("deal_id")
-    const client_id =
-      url.searchParams.get("client_id")
-    const branch_id =
-      url.searchParams.get("branch_id")
-    const contact_id =
-      url.searchParams.get("contact_id")
-    const product_module_id =
-      url.searchParams.get("product_module_id")
-    const product_service_id =
-      url.searchParams.get("product_service_id")
-    const status = url.searchParams.get("status")
-
     let query = authContext.supabase
-      .from(QUOTATIONS_TABLE)
+      .from(SUBSCRIPTIONS_TABLE)
       .select("*")
 
-    if (quotation_number) {
-      query = query.eq(
-        "quotation_number",
-        quotation_number
-      )
-    }
+    for (const key of url.searchParams.keys()) {
+      const value = url.searchParams.get(key)
 
-    if (deal_id) {
-      query = query.eq("deal_id", deal_id)
-    }
-
-    if (client_id) {
-      query = query.eq("client_id", client_id)
-    }
-
-    if (branch_id) {
-      query = query.eq("branch_id", branch_id)
-    }
-
-    if (contact_id) {
-      query = query.eq("contact_id", contact_id)
-    }
-
-    if (product_module_id) {
-      query = query.eq(
-        "product_module_id",
-        product_module_id
-      )
-    }
-
-    if (product_service_id) {
-      query = query.eq(
-        "product_service_id",
-        product_service_id
-      )
-    }
-
-    if (status && isQuotationStatus(status)) {
-      query = query.eq("status", status)
+      if (value) {
+        query = query.eq(key, value)
+      }
     }
 
     const { data, error } = await query.order(
@@ -430,14 +404,14 @@ export async function GET(request: Request) {
         {
           error:
             error.message ??
-            "Failed to fetch quotations.",
+            "Failed to fetch subscriptions.",
         },
         { status: 400 }
       )
     }
 
     return NextResponse.json({
-      quotations: data ?? [],
+      subscriptions: data ?? [],
     })
   } catch (error) {
     return NextResponse.json(
@@ -445,7 +419,7 @@ export async function GET(request: Request) {
         error:
           error instanceof Error
             ? error.message
-            : "Failed to fetch quotations.",
+            : "Failed to fetch subscriptions.",
       },
       { status: 500 }
     )
@@ -453,7 +427,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST /api/quotations
+ * POST /api/subscriptions
  */
 export async function POST(request: Request) {
   try {
@@ -469,21 +443,21 @@ export async function POST(request: Request) {
     }
 
     const body =
-      (await request.json()) as QuotationPayload
+      (await request.json()) as SubscriptionPayload
 
     const payload = normalizeCreatePayload(
       body,
       authContext.userId
     )
 
-    await validateQuotationReferences(
+    await validateSubscriptionReferences(
       authContext.supabase,
       payload
     )
 
     const { data, error } =
       await authContext.supabase
-        .from(QUOTATIONS_TABLE)
+        .from(SUBSCRIPTIONS_TABLE)
         .insert(payload)
         .select()
         .single()
@@ -493,14 +467,14 @@ export async function POST(request: Request) {
         {
           error:
             error?.message ??
-            "Failed to create quotation.",
+            "Failed to create subscription.",
         },
         { status: 400 }
       )
     }
 
     return NextResponse.json(
-      { quotation: data },
+      { subscription: data },
       { status: 201 }
     )
   } catch (error) {

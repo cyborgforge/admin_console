@@ -105,17 +105,17 @@ function buildUpdateData(
   const updateData: Record<string, unknown> = {}
 
   if (payload.company_name !== undefined) {
-    const companyName = readString(
+    const company_name = readString(
       payload.company_name
     )
 
-    if (!companyName) {
+    if (!company_name) {
       throw new Error(
         "company_name cannot be empty."
       )
     }
 
-    updateData.company_name = companyName
+    updateData.company_name = company_name
   }
 
   if (payload.industry !== undefined) {

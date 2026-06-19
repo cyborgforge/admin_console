@@ -2,19 +2,45 @@ import { NextResponse } from "next/server"
 
 import { getSupabaseServerClient } from "@/lib/supabaseServer"
 
-const CONTACTS_TABLE =
-  process.env.SUPABASE_CONTACTS_TABLE ?? "contacts"
+const DEALS_TABLE =
+  process.env.SUPABASE_DEALS_TABLE ?? "deals"
 
-type ContactPayload = {
-  name?: unknown
-  designation?: unknown
-  department?: unknown
-  email?: unknown
-  mobile?: unknown
-  phone?: unknown
-  linkedin?: unknown
+type DealStage =
+  | "new"
+  | "quote sent"
+  | "negotiation"
+  | "reviewing"
+  | "hold"
+  | "won"
+  | "lost"
+
+type DealPayload = {
+  deal_name?: unknown
   client_id?: unknown
   branch_id?: unknown
+  primary_contact_id?: unknown
+  stage?: unknown
+  expected_value?: unknown
+  source_lead_id?: unknown
+  assigned_to?: unknown
+  description?: unknown
+  current_quotation_id?: unknown
+  lost_reason?: unknown
+  won_date?: unknown
+}
+
+function isDealStage(
+  value: unknown
+): value is DealStage {
+  return (
+    value === "new" ||
+    value === "quote sent" ||
+    value === "negotiation" ||
+    value === "reviewing" ||
+    value === "hold" ||
+    value === "won" ||
+    value === "lost"
+  )
 }
 
 function readString(value: unknown) {
@@ -40,6 +66,22 @@ function readRequiredUuid(
   }
 
   return trimmed
+}
+
+function readNullableNumber(value: unknown) {
+  if (value === undefined || value === null) {
+    return null
+  }
+
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed)) {
+    throw new Error(
+      "expected_value must be a valid number."
+    )
+  }
+
+  return parsed
 }
 
 function getAccessToken(request: Request) {
@@ -94,10 +136,10 @@ async function requireAuthenticatedRequest(
 }
 
 function normalizeCreatePayload(
-  payload: ContactPayload,
+  payload: DealPayload,
   userId: string
 ) {
-  const name = readString(payload.name)
+  const deal_name = readString(payload.deal_name)
   const client_id = readRequiredUuid(
     payload.client_id,
     "client_id"
@@ -107,26 +149,50 @@ function normalizeCreatePayload(
     "branch_id"
   )
 
-  if (!name) {
-    throw new Error("name is required.")
+  if (!deal_name) {
+    throw new Error("deal_name is required.")
+  }
+
+  if (
+    payload.stage !== undefined &&
+    !isDealStage(payload.stage)
+  ) {
+    throw new Error(
+      "stage must be new, quote sent, negotiation, reviewing, hold, won, or lost."
+    )
   }
 
   return {
-    name,
-    designation: readNullableString(
-      payload.designation
-    ),
-    department: readNullableString(
-      payload.department
-    ),
-    email: readNullableString(payload.email),
-    mobile: readNullableString(payload.mobile),
-    phone: readNullableString(payload.phone),
-    linkedin: readNullableString(
-      payload.linkedin
-    ),
+    deal_name,
     client_id,
     branch_id,
+    primary_contact_id: readNullableString(
+      payload.primary_contact_id
+    ),
+    stage: isDealStage(payload.stage)
+      ? payload.stage
+      : "new",
+    expected_value: readNullableNumber(
+      payload.expected_value
+    ),
+    source_lead_id: readNullableString(
+      payload.source_lead_id
+    ),
+    assigned_to: readNullableString(
+      payload.assigned_to
+    ),
+    description: readNullableString(
+      payload.description
+    ),
+    current_quotation_id: readNullableString(
+      payload.current_quotation_id
+    ),
+    lost_reason: readNullableString(
+      payload.lost_reason
+    ),
+    won_date: readNullableString(
+      payload.won_date
+    ),
     created_by: userId,
   }
 }
@@ -152,8 +218,68 @@ async function requireRecordExists(
   }
 }
 
+async function validateDealReferences(
+  supabase: NonNullable<
+    Awaited<
+      ReturnType<typeof requireAuthenticatedRequest>
+    >["supabase"]
+  >,
+  payload: Record<string, unknown>
+) {
+  if (typeof payload.client_id === "string") {
+    await requireRecordExists(
+      supabase,
+      "clients",
+      payload.client_id,
+      "client_id"
+    )
+  }
+
+  if (typeof payload.branch_id === "string") {
+    await requireRecordExists(
+      supabase,
+      "branches",
+      payload.branch_id,
+      "branch_id"
+    )
+  }
+
+  if (
+    typeof payload.primary_contact_id ===
+    "string"
+  ) {
+    await requireRecordExists(
+      supabase,
+      "contacts",
+      payload.primary_contact_id,
+      "primary_contact_id"
+    )
+  }
+
+  if (typeof payload.source_lead_id === "string") {
+    await requireRecordExists(
+      supabase,
+      "leads",
+      payload.source_lead_id,
+      "source_lead_id"
+    )
+  }
+
+  if (
+    typeof payload.current_quotation_id ===
+    "string"
+  ) {
+    await requireRecordExists(
+      supabase,
+      "quotations",
+      payload.current_quotation_id,
+      "current_quotation_id"
+    )
+  }
+}
+
 /**
- * GET /api/contacts
+ * GET /api/deals
  */
 export async function GET(request: Request) {
   try {
@@ -172,9 +298,16 @@ export async function GET(request: Request) {
       url.searchParams.get("client_id")
     const branch_id =
       url.searchParams.get("branch_id")
+    const primary_contact_id =
+      url.searchParams.get("primary_contact_id")
+    const source_lead_id =
+      url.searchParams.get("source_lead_id")
+    const assigned_to =
+      url.searchParams.get("assigned_to")
+    const stage = url.searchParams.get("stage")
 
     let query = authContext.supabase
-      .from(CONTACTS_TABLE)
+      .from(DEALS_TABLE)
       .select("*")
 
     if (client_id) {
@@ -183,6 +316,28 @@ export async function GET(request: Request) {
 
     if (branch_id) {
       query = query.eq("branch_id", branch_id)
+    }
+
+    if (primary_contact_id) {
+      query = query.eq(
+        "primary_contact_id",
+        primary_contact_id
+      )
+    }
+
+    if (source_lead_id) {
+      query = query.eq(
+        "source_lead_id",
+        source_lead_id
+      )
+    }
+
+    if (assigned_to) {
+      query = query.eq("assigned_to", assigned_to)
+    }
+
+    if (stage && isDealStage(stage)) {
+      query = query.eq("stage", stage)
     }
 
     const { data, error } = await query.order(
@@ -195,14 +350,14 @@ export async function GET(request: Request) {
         {
           error:
             error.message ??
-            "Failed to fetch contacts.",
+            "Failed to fetch deals.",
         },
         { status: 400 }
       )
     }
 
     return NextResponse.json({
-      contacts: data ?? [],
+      deals: data ?? [],
     })
   } catch (error) {
     return NextResponse.json(
@@ -210,7 +365,7 @@ export async function GET(request: Request) {
         error:
           error instanceof Error
             ? error.message
-            : "Failed to fetch contacts.",
+            : "Failed to fetch deals.",
       },
       { status: 500 }
     )
@@ -218,7 +373,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST /api/contacts
+ * POST /api/deals
  */
 export async function POST(request: Request) {
   try {
@@ -234,30 +389,21 @@ export async function POST(request: Request) {
     }
 
     const body =
-      (await request.json()) as ContactPayload
+      (await request.json()) as DealPayload
 
     const payload = normalizeCreatePayload(
       body,
       authContext.userId
     )
 
-    await requireRecordExists(
+    await validateDealReferences(
       authContext.supabase,
-      "clients",
-      payload.client_id,
-      "client_id"
-    )
-
-    await requireRecordExists(
-      authContext.supabase,
-      "branches",
-      payload.branch_id,
-      "branch_id"
+      payload
     )
 
     const { data, error } =
       await authContext.supabase
-        .from(CONTACTS_TABLE)
+        .from(DEALS_TABLE)
         .insert(payload)
         .select()
         .single()
@@ -267,14 +413,14 @@ export async function POST(request: Request) {
         {
           error:
             error?.message ??
-            "Failed to create contact.",
+            "Failed to create deal.",
         },
         { status: 400 }
       )
     }
 
     return NextResponse.json(
-      { contact: data },
+      { deal: data },
       { status: 201 }
     )
   } catch (error) {

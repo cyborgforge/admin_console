@@ -103,11 +103,11 @@ function normalizeCreatePayload(
   payload: ClientPayload,
   userId: string
 ) {
-  const companyName = readString(
+  const company_name = readString(
     payload.company_name
   )
 
-  if (!companyName) {
+  if (!company_name) {
     throw new Error("company_name is required.")
   }
 
@@ -121,7 +121,7 @@ function normalizeCreatePayload(
   }
 
   return {
-    company_name: companyName,
+    company_name,
     industry: readNullableString(
       payload.industry
     ),
