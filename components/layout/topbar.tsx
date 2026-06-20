@@ -18,6 +18,7 @@ const titles: Record<string, string> = {
   "/subscriptions": "Subscriptions",
   "/accounts": "Accounts",
   "/pipeline": "Pipeline",
+  "/ProductManagement": "Product Management",
 }
 
 export function Topbar() {
@@ -34,12 +35,33 @@ export function Topbar() {
   const clientId = match ? match[1] : null
 
   useEffect(() => {
-  if (clientId) {
-    setDynamicTitle("Client Details")
-  } else {
-    setDynamicTitle(titles[pathname] ?? "Dashboard")
-  }
-}, [pathname, clientId])
+    if (pathname.match(/^\/clients\/[^/]+\/editing$/)) {
+      setDynamicTitle("Edit Client")
+    } else if (clientId) {
+      setDynamicTitle("Client Details")
+    } else {
+      const mapped = titles[pathname]
+      if (mapped) {
+        setDynamicTitle(mapped)
+      } else {
+        const segments = pathname.split("/").filter(Boolean)
+        if (segments.length === 0) {
+          setDynamicTitle("Dashboard")
+        } else {
+          const lastSegment = segments[segments.length - 1]
+          const words = lastSegment
+            .replace(/([A-Z])/g, " $1")
+            .replace(/[_-]+/g, " ")
+            .trim()
+          const capitalized = words
+            .split(" ")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ")
+          setDynamicTitle(capitalized)
+        }
+      }
+    }
+  }, [pathname, clientId])
 
   return (
     <header className="topbar">

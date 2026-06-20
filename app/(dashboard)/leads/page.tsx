@@ -354,8 +354,11 @@ export default function LeadsPage() {
           width:100%;
           justify-content: space-between;
           align-items: center;
-          padding: 20px 24px 0;
+          padding: 20px 24px 20px;
           background: #171A21;
+          position: sticky;
+          top: 56px;
+          z-index: 4;
         }
         .lp-page-title {
           font-size: 24px;
@@ -382,12 +385,12 @@ export default function LeadsPage() {
 
         /* ── Layout ───────────────────────────────────────────────────────── */
         .lp-content {
-  width: 100%;
-  padding: 20px 24px 24px;
-  background: #141416;
-  min-height: calc(100vh - 80px);
-  box-sizing: border-box;
-} 
+          width: 100%;
+          padding: 20px 24px 24px;
+          background: #141416;
+          min-height: calc(100vh - 56px);
+          box-sizing: border-box;
+        } 
 
         /* ── Stat Cards ───────────────────────────────────────────────────── */
         .lp-stats {

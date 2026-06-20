@@ -7,6 +7,7 @@ import {
   FileText,
   Landmark,
   LayoutGrid,
+  Package,
   ReceiptText,
   RefreshCw,
   Settings,
@@ -26,6 +27,7 @@ const navMain = [
   { href: "/invoices", label: "Invoices", icon: ReceiptText },
   { href: "/subscriptions", label: "Subscriptions", icon: RefreshCw },
   { href: "/accounts", label: "Accounts", icon: Landmark },
+  {href:"/ProductManagement",label:"Producs",icon:Package}
 ]
 
 const navViews = [{ href: "/pipeline", label: "Pipeline", icon: BarChart3 }]
