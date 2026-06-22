@@ -4,7 +4,7 @@ export type Client = {
   id: string
   name: string
   role: string
-  organization: string
+ 
   industry: string
   city: string
   email: string
@@ -53,7 +53,6 @@ export type UpdateClientPayload = {
   company_name?: string
   name?: string
   role?: string
-  organization?: string
   industry?: string
   website?: string
   gstNumber?: string

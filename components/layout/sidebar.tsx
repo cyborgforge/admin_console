@@ -7,6 +7,7 @@ import {
   FileText,
   Landmark,
   LayoutGrid,
+  Package,
   ReceiptText,
   RefreshCw,
   Settings,
@@ -20,11 +21,13 @@ import { useQuotations } from "@/hooks/use-quotations"
 
 const navMain = [
   { href: "/", label: "Dashboard", icon: LayoutGrid },
+  { href: "/leads", label: "Leads", icon: Landmark },
   { href: "/quotations", label: "Quotations", icon: FileText },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/invoices", label: "Invoices", icon: ReceiptText },
   { href: "/subscriptions", label: "Subscriptions", icon: RefreshCw },
   { href: "/accounts", label: "Accounts", icon: Landmark },
+  {href:"/ProductManagement",label:"Producs",icon:Package}
 ]
 
 const navViews = [{ href: "/pipeline", label: "Pipeline", icon: BarChart3 }]
