@@ -17,11 +17,13 @@ export function ClientCard({
   client: Client
   onClick?: () => void
 }) {
+  console.log("ClientCard data:", client)
   return (
-    <div className="client-card" onClick={onClick}>
+    // <div className="client-card" onClick={onClick}>
+    <div className="client-card" >
       <div className="client-card-header">
-        <div className="client-card-avatar" style={{ backgroundColor: `${client.color}22`, color: client.color }}>
-          {client.name
+        <div className="client-card-avatar" style={{ backgroundColor: `#1e40af22`, color: "#1e40af" }}>
+          {client.company_name
             .split(" ")
             .map((word) => word[0])
             .join("")
@@ -29,25 +31,26 @@ export function ClientCard({
         </div>
         <span className={clientBadgeClass(client.status)}>{labels[client.status]}</span>
       </div>
-      <div className="client-card-name">{client.name}</div>
-      <div className="client-card-role">{client.role}</div>
-      <div style={{ fontSize: "13px", fontWeight: 500, marginBottom: "2px", marginTop: "10px" }}>{client.organization}</div>
+      <div className="client-card-name">{client.company_name}</div>
+      {/* <div className="client-card-role">{client.role}</div> */}
+      <div style={{ fontSize: "13px", fontWeight: 500, marginBottom: "2px", marginTop: "10px" }}>{client.industry}</div>
       <div style={{ fontSize: "11.5px", color: "var(--text3)", marginBottom: "12px" }}>{client.industry} · {client.city}</div>
       <hr className="client-card-divider" />
-      <div className="client-card-meta">
+       <div className="client-card-meta">
         <div>
           <div className="client-card-meta-label">Product</div>
-          <div className="client-card-meta-val">{client.product}</div>
+          <div className="client-card-meta-val">None</div>
         </div>
         <div>
           <div className="client-card-meta-label">Quotes</div>
-          <div className="client-card-meta-val">{client.quotes}</div>
+          <div className="client-card-meta-val">0</div>
         </div>
       </div>
       <div className="client-card-footer">
-        <span className="amount" style={{ color: "var(--accent2)" }}>Rs {client.totalBilled.toLocaleString("en-IN")}</span>
-        <span style={{ fontSize: "11.5px", color: "var(--text3)" }}>{client.since}</span>
-      </div>
+        {/* <span className="amount" style={{ color: "var(--accent2)" }}>Rs {client.totalBilled.toLocaleString("en-IN")}</span> */}
+        <span style={{ fontSize: "11.5px", color: "var(--text3)" }}>0</span>
+      </div>  
+      
     </div>
   )
 }

@@ -4,6 +4,10 @@ import { getSupabaseServerClient } from "@/lib/supabaseServer"
 
 const CLIENTS_TABLE =
   process.env.SUPABASE_CLIENTS_TABLE ?? "clients"
+  const CONTACTS_TABLE =
+  process.env.SUPABASE_CONTACTS_TABLE ?? "contacts"
+  const DEALS_TABLE =
+  process.env.SUPABASE_DEALS_TABLE ?? "deals"
 
 type ClientStatus =
   | "active"
@@ -211,22 +215,78 @@ export async function GET(
     return authContext.errorResponse!
   }
 
-  const { data, error } =
-    await authContext.supabase
+  const supabase = authContext.supabase
+
+  const [
+    clientResult,
+    contactsResult,
+    dealsResult,
+  ] = await Promise.all([
+    supabase
       .from(CLIENTS_TABLE)
       .select("*")
       .eq("id", id)
-      .single()
+      .single(),
 
-  if (error || !data) {
+    supabase
+      .from(CONTACTS_TABLE)
+      .select("*")
+      .eq("client_id", id)
+      .order("created_at", {
+        ascending: false,
+      }),
+
+    supabase
+      .from(DEALS_TABLE)
+      .select("*")
+      .eq("client_id", id)
+      .order("created_at", {
+        ascending: false,
+      }),
+  ])
+
+  const {
+    data: clientData,
+    error: clientError,
+  } = clientResult
+
+  if (clientError || !clientData) {
     return NextResponse.json(
-      { error: "Client not found." },
+      {
+        error: "Client not found.",
+      },
       { status: 404 }
     )
   }
 
+  if (contactsResult.error) {
+    return NextResponse.json(
+      {
+        error:
+          contactsResult.error.message,
+      },
+      { status: 400 }
+    )
+  }
+
+  if (dealsResult.error) {
+    return NextResponse.json(
+      {
+        error:
+          dealsResult.error.message,
+      },
+      { status: 400 }
+    )
+  }
+
   return NextResponse.json({
-    client: data,
+    client: clientData,
+
+    contacts:
+      contactsResult.data ?? [],
+
+    deals:
+      dealsResult.data ?? [],
   })
 }
 

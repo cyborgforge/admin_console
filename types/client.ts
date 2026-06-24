@@ -1,23 +1,53 @@
 export type ClientStatus = "active" | "inactive" | "prospect"
 
+// export type Client = {
+//   id: string
+//   name: string
+//   role: string
+//   organization: string
+//   industry: string
+//   city: string
+//   email: string
+//   phone: string
+//   status: ClientStatus
+//   product: string
+//   totalBilled: number
+//   quotes: number
+//   since: string
+//   color: string
+//   gst: string
+//   notes: string
+// }
+
 export type Client = {
-  id: string
-  name: string
-  role: string
- 
-  industry: string
-  city: string
-  email: string
-  phone: string
+ id: string
+
+  company_name: string
+  industry: string | null
+  website: string | null
+  gst_number: string | null
+  company_size: string | null
+
+  email: string | null
+  phone: string | null
+
+  address_line_1: string | null
+  city: string | null
+  state: string | null
+  country: string | null
+  postal_code: string | null
+
   status: ClientStatus
-  product: string
-  totalBilled: number
-  quotes: number
-  since: string
+
+  createdAt: string
+  updatedAt: string
+
+  created_by: string | null
+
   color: string
-  gst: string
-  notes: string
+  notes:string | null
 }
+
 
 export type CreateClientPayload = {
   companyName?: string

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import type { Client } from "@/types/client"
+import Link from "next/link"
 
 type ClientChangedDetail = {
   client?: Client
@@ -149,17 +150,17 @@ export default function ClientsPage() {
 
   const filteredClients = useMemo(() => {
     return clients.filter((client) => {
-      const searchText = `${client.name} ${client.organization} ${client.city}`.toLowerCase()
+      const searchText = `${client.company_name} ${client.industry} ${client.city}`.toLowerCase()
       const matchesQuery = searchText.includes(query.toLowerCase())
       const matchesStatus = status ? client.status === status : true
-      const matchesProduct = product ? client.product.toLowerCase().includes(product.toLowerCase()) : true
-      return matchesQuery && matchesStatus && matchesProduct
+      //const matchesProduct = product ? client.product.toLowerCase().includes(product.toLowerCase()) : true
+      return matchesQuery && matchesStatus //&& matchesProduct
     })
   }, [clients, query, status, product])
 
   const totalClients = clients.length
   const activeClients = clients.filter((client) => client.status === "active").length
-  const totalRevenue = clients.reduce((sum, client) => sum + client.totalBilled, 0)
+  const totalRevenue = 0 // clients.reduce((sum, client) => sum + client.totalBilled, 0) totalBilled is not available in the current Client type, so this is set to 0 for now
   const avgDealSize = totalClients > 0 ? Math.round(totalRevenue / totalClients) : 0
 
   return (
@@ -203,7 +204,9 @@ export default function ClientsPage() {
       {view === "grid" ? (
         <div id="clients-grid">
           {filteredClients.map((client) => (
+            <Link href={`/clients/${client.id}`}>
             <ClientCard key={client.id} client={client} onClick={() => setSelectedClient(client)} />
+            </Link>
           ))}
         </div>
       ) : (
@@ -212,6 +215,8 @@ export default function ClientsPage() {
         </div>
       )}
 
+
+{/* --- Right sheet UI --*/}
       <Sheet open={Boolean(selectedClient)} onOpenChange={(open) => !open && setSelectedClient(null)}>
         <SheetContent side="right" className="panel add-client-sheet" showCloseButton={false}>
           {selectedClient ? (
@@ -219,16 +224,16 @@ export default function ClientsPage() {
               <SheetHeader className="panel-header add-client-header">
                 <div className="client-cell" style={{ alignItems: "center", gap: "12px" }}>
                   <div className="client-avatar" style={{ width: "34px", height: "34px", backgroundColor: `${selectedClient.color}22`, color: selectedClient.color }}>
-                    {selectedClient.name
+                    {selectedClient.company_name
                       .split(" ")
                       .map((word) => word[0])
                       .join("")
                       .slice(0, 2)}
                   </div>
                   <div>
-                    <SheetTitle className="panel-title text-(--text)">{selectedClient.name} · {selectedClient.role}</SheetTitle>
+                    <SheetTitle className="panel-title text-(--text)">{selectedClient.company_name}</SheetTitle>
                     <SheetDescription className="panel-subtitle" style={{ marginTop: "2px" }}>
-                      {selectedClient.organization} · {selectedClient.city}
+                      {selectedClient.industry} · {selectedClient.city}
                     </SheetDescription>
                   </div>
                 </div>
@@ -248,18 +253,18 @@ export default function ClientsPage() {
                   <div className="info-row"><div className="info-row-label">Email</div><div className="info-row-val">{selectedClient.email}</div></div>
                   <div className="info-row"><div className="info-row-label">Phone</div><div className="info-row-val">{selectedClient.phone}</div></div>
                   <div className="info-row"><div className="info-row-label">Industry</div><div className="info-row-val">{selectedClient.industry}</div></div>
-                  <div className="info-row"><div className="info-row-label">Product</div><div className="info-row-val">{selectedClient.product}</div></div>
-                  <div className="info-row"><div className="info-row-label">GST Number</div><div className="info-row-val">{selectedClient.gst || "-"}</div></div>
-                  <div className="info-row"><div className="info-row-label">Client since</div><div className="info-row-val">{selectedClient.since}</div></div>
+                  {/* <div className="info-row"><div className="info-row-label">Product</div><div className="info-row-val">{selectedClient.product}</div></div> */}
+                  <div className="info-row"><div className="info-row-label">GST Number</div><div className="info-row-val">{selectedClient.gst_number || "-"}</div></div>
+                  {/* <div className="info-row"><div className="info-row-label">Client since</div><div className="info-row-val">{selectedClient.since}</div></div> */}
                   <div className="info-row">
                     <div className="info-row-label">Status</div>
                     <div className="info-row-val">
                       <span className={clientStatusBadgeClass(selectedClient.status)}>{clientStatusLabel[selectedClient.status]}</span>
                     </div>
                   </div>
-                  <div className="info-row"><div className="info-row-label">Notes</div><div className="info-row-val">{selectedClient.notes || "No notes yet"}</div></div>
+                  {/* <div className="info-row"><div className="info-row-label">Notes</div><div className="info-row-val">{selectedClient.notes || "No notes yet"}</div></div> */}
                 </div>
-                <div className="client-detail-stats">
+                {/* <div className="client-detail-stats">
                   <div className="stat-card" style={{ padding: "12px 14px" }}>
                     <div className="stat-label">Total billed</div>
                     <div className="stat-val" style={{ fontSize: "20px", color: "#10B981" }}>Rs {selectedClient.totalBilled.toLocaleString("en-IN")}</div>
@@ -272,7 +277,7 @@ export default function ClientsPage() {
                     <div className="stat-label">Client since</div>
                     <div className="stat-val" style={{ fontSize: "20px", color: "#E8EAF0" }}>{selectedClient.since}</div>
                   </div>
-                </div>
+                </div> */}
 
                 <div>
                   <div className="section-heading" style={{ marginBottom: "10px" }}>Quote history</div>
@@ -351,7 +356,7 @@ export default function ClientsPage() {
         </SheetContent>
       </Sheet>
 
-      <NewQuoteDialog
+      {/* <NewQuoteDialog
         hideTrigger
         mode="create"
         open={newQuoteOpen}
@@ -359,14 +364,14 @@ export default function ClientsPage() {
         initialClient={
           quoteSeedClient
             ? {
-              name: quoteSeedClient.name,
-              organization: quoteSeedClient.organization,
+              name: quoteSeedClient.companyName,
+              organization: quoteSeedClient.industry,
               email: quoteSeedClient.email,
               phone: quoteSeedClient.phone,
             }
             : null
         }
-      />
+      /> */}
 
       <AddClientDialog
         hideTrigger
