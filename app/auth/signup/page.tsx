@@ -21,7 +21,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      router.replace("/quotations")
+      router.replace("/")
     }
   }, [isAuthenticated, loading, router])
 
@@ -50,7 +50,7 @@ export default function SignupPage() {
 
       if (data.session) {
         toast.success("Account created and logged in.")
-        router.replace("/quotations")
+        router.replace("/")
       } else {
         toast.success("Account created. Check your email to confirm your account.")
         router.replace("/auth/login")

@@ -17,7 +17,7 @@ function LoginForm() {
   const redirectPath = useMemo(() => {
     const raw = params.get("redirect")
     if (!raw || !raw.startsWith("/")) {
-      return "/quotations"
+      return "/"
     }
 
     return raw
