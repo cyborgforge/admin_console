@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { LayoutGrid, Rows3, X } from "lucide-react"
 import { useRef } from "react"
 
-import { AddClientDialog } from "@/components/clients/add-client-dialog"
+//import { AddClientDialog } from "@/components/clients/add-client-dialog"
 import { ClientCard } from "@/components/clients/client-card"
 import { ClientTable } from "@/components/clients/client-table"
 import { NewQuoteDialog } from "@/components/quotations/new-quote-dialog"
@@ -373,13 +373,13 @@ export default function ClientsPage() {
         }
       /> */}
 
-      <AddClientDialog
+      {/* <AddClientDialog
         hideTrigger
         mode="edit"
         open={editClientOpen}
         onOpenChange={setEditClientOpen}
         clientToEdit={clientToEdit}
-      />
+      /> */}
     </div>
   )
 }

@@ -11,7 +11,7 @@ import { DealPipeline, Deal } from "@/components/clients/deal-pipeline"
 import { UpcomingTasks, Task } from "@/components/clients/upcoming-tasks"
 import { AddActivityModal } from "@/components/clients/add-activity-modal"
 import { NewDealModal } from "@/components/clients/new-deal-modal"
-import { AddClientDialog } from "@/components/clients/add-client-dialog"
+//import { AddClientDialog } from "@/components/clients/add-client-dialog"
 import { NewTaskModal } from "@/components/clients/new-task-modal"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -730,13 +730,13 @@ export default function ClientDetailsPage({ params }: PageProps) {
       </div>
 
       {/* Edit Client dialog from existing system */}
-      <AddClientDialog
+      {/* <AddClientDialog
         hideTrigger
         mode="edit"
         open={isEditClientOpen}
         onOpenChange={setIsEditClientOpen}
         clientToEdit={client}
-      />
+      /> */}
 
       {/* Add Activity Modal */}
       <AddActivityModal

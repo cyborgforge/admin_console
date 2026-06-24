@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 
-import { NewQuoteDialog } from "../quotations/new-quote-dialog"
-import { NewInvoiceDialog } from "../invoices/new-invoice-dialog"
-import { AddSubscriptionDialog } from "../subscriptions/add-subscription-dialog"
-import { RecordPaymentDialog } from "../accounts/record-payment-dialog"
-import { AddClientDialog } from "../clients/add-client-dialog"
+// import { NewQuoteDialog } from "../quotations/new-quote-dialog"
+// import { NewInvoiceDialog } from "../invoices/new-invoice-dialog"
+// import { AddSubscriptionDialog } from "../subscriptions/add-subscription-dialog"
+// import { RecordPaymentDialog } from "../accounts/record-payment-dialog"
+// import { AddClientDialog } from "../clients/add-client-dialog.tsx.notused"
 
 const titles: Record<string, string> = {
   "/": "Dashboard",
@@ -67,11 +67,11 @@ export function Topbar() {
     <header className="topbar">
       <div className="topbar-title">{dynamicTitle}</div>
       <div className="topbar-right">
-        {isQuotations ? <NewQuoteDialog triggerClassName="btn btn-primary" /> : null}
-        {isClients ? <AddClientDialog triggerClassName="btn btn-primary" /> : null}
-        {isInvoices ? <NewInvoiceDialog triggerClassName="btn btn-primary" /> : null}
-        {isSubscriptions ? <AddSubscriptionDialog triggerClassName="btn btn-primary" /> : null}
-        {isAccounts ? <RecordPaymentDialog triggerClassName="btn btn-ghost" /> : null}
+        {/* {isQuotations ? <NewQuoteDialog triggerClassName="btn btn-primary" /> : null} */}
+        {/* {isClients ? <AddClientDialog triggerClassName="btn btn-primary" /> : null} */}
+        {/* {isInvoices ? <NewInvoiceDialog triggerClassName="btn btn-primary" /> : null} */}
+        {/* {isSubscriptions ? <AddSubscriptionDialog triggerClassName="btn btn-primary" /> : null} */}
+        {/* {isAccounts ? <RecordPaymentDialog triggerClassName="btn btn-ghost" /> : null} */}
         {/* {isLeads ? <RecordPaymentDialog triggerClassName="btn btn-ghost" /> : null} */}
         
       </div>
