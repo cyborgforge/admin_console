@@ -82,8 +82,8 @@ export default function EditLead({
               <div className="lp-view-field-label">LEAD NAME</div>
               <input
                 className="lp-inline-input"
-                value={editDraft.name}
-                onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
+                value={editDraft.leadName}
+                onChange={(e) => setEditDraft({ ...editDraft, leadName: e.target.value })}
               />
             </div>
 
@@ -113,8 +113,8 @@ export default function EditLead({
               <div className="lp-view-field-label">COMPANY</div>
               <input
                 className="lp-inline-input"
-                value={editDraft.org}
-                onChange={(e) => setEditDraft({ ...editDraft, org: e.target.value })}
+                value={editDraft.company}
+                onChange={(e) => setEditDraft({ ...editDraft, company: e.target.value })}
               />
             </div>
 
@@ -127,7 +127,7 @@ export default function EditLead({
             {/* CREATED AT — read-only */}
             <div className="lp-view-field">
               <div className="lp-view-field-label">CREATED AT</div>
-              <div className="lp-view-field-val">{editDraft.addedOn}</div>
+              <div className="lp-view-field-val">{editDraft.createdDate}</div>
             </div>
 
             {/* STATUS badge */}
@@ -150,7 +150,7 @@ export default function EditLead({
           </div>
 
           {/* NOTES */}
-          <div className="lp-view-notes-field">
+          {/* <div className="lp-view-notes-field">
             <div className="lp-view-field-label">NOTES</div>
             <textarea
               className="lp-inline-textarea"
@@ -158,7 +158,7 @@ export default function EditLead({
               placeholder="Add notes..."
               onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })}
             />
-          </div>
+          </div> */}
         </div>
 
         {/* Footer: Empty in edit mode */}

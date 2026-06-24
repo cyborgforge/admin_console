@@ -1,55 +1,70 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Eye, Search } from "lucide-react"
 import ViewLead from "@/components/leads/ViewLead"
 import EditLead from "@/components/leads/EditLead"
+import { getSupabaseClient } from "@/lib/supabaseClient"
+import CreateLeadModal from "@/components/leads/createLeadModal"
+import CreateLeadButton from "@/components/leads/createLeadButton"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type LeadStatus = "new" | "contacted" | "reviewed" | "found" | "not_found" | "converted" | "archived"
+export type LeadStatus = "discovery" | "contacted" | "reviewing" | "closed-won" | "closed-lost"
 
-export interface Lead {
-  id: string
-  name: string
-  org: string
+export type CreateLeadDraft = {
+  leadName: string
+  company: string
   email: string
   phone: string
   status: LeadStatus
-  addedOn: string
-  notes: string
+}
+
+export interface Lead {
+  id: string
+  //name: string
+  leadName: string
+  //org: string
+  company: string
+  email: string
+  phone: string
+  status: LeadStatus
+  //addedOn: string
+  createdDate: string
+  //notes: string
   color: string
 }
+
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = ["#4c7ee1", "#8b5cf6", "#ec4899", "#d3a335", "#1ead82", "#06b6d4", "#f97316"]
 
-const MOCK_LEADS: Lead[] = [
-  { id: "L-1001", name: "Murali Prakash S", org: "Murali & Co",      email: "murali@gmail.com",   phone: "6734567183", status: "new",       addedOn: "2026-04-10", notes: "", color: "#4c7ee1" },
-  { id: "L-1002", name: "Anitha Rajan",     org: "Anitha Pharma",    email: "anitha@gmail.com",   phone: "9876543210", status: "contacted", addedOn: "2026-04-11", notes: "Interests: Pharmacy Suite, Clinic Suite", color: "#8b5cf6" },
-  { id: "L-1003", name: "Vikram Suresh",    org: "Vikram Clinics",   email: "vikram@gmail.com",   phone: "8765432109", status: "reviewed",  addedOn: "2026-04-12", notes: "", color: "#ec4899" },
-  { id: "L-1004", name: "Priya Nair",       org: "Priya Health",     email: "priya@gmail.com",    phone: "7654321098", status: "found",     addedOn: "2026-04-13", notes: "", color: "#1ead82" },
-  { id: "L-1005", name: "Senthil Kumar",    org: "SK Medicals",      email: "senthil@gmail.com",  phone: "6543210987", status: "not_found", addedOn: "2026-04-14", notes: "", color: "#d3a335" },
-  { id: "L-1006", name: "Deepa Menon",      org: "Deepa Healthcare", email: "deepa@gmail.com",    phone: "9988776655", status: "new",       addedOn: "2026-04-15", notes: "", color: "#06b6d4" },
-  { id: "L-1007", name: "Arun Chandran",    org: "Arun Hospitals",   email: "arun@gmail.com",     phone: "8877665544", status: "converted", addedOn: "2026-04-16", notes: "", color: "#f97316" },
-  { id: "L-1008", name: "Kavitha Balu",     org: "Kavitha Pharmacy", email: "kavitha@gmail.com",  phone: "7766554433", status: "new",       addedOn: "2026-04-17", notes: "", color: "#4c7ee1" },
-  { id: "L-1009", name: "Ravi Shankar",     org: "Ravi Surgicals",   email: "ravi@gmail.com",     phone: "6655443322", status: "archived",  addedOn: "2026-04-18", notes: "", color: "#8b5cf6" },
-  { id: "L-1010", name: "Meena Pillai",     org: "Meena Medicals",   email: "meena@gmail.com",    phone: "9900112233", status: "new",       addedOn: "2026-04-19", notes: "", color: "#1ead82" },
-  { id: "L-1011", name: "Suresh Babu",      org: "Suresh Clinics",   email: "suresh@gmail.com",   phone: "8811223344", status: "contacted", addedOn: "2026-04-20", notes: "", color: "#d3a335" },
-  { id: "L-1012", name: "Lakshmi Venkat",   org: "Lakshmi Stores",   email: "lakshmi@gmail.com",  phone: "7722334455", status: "new",       addedOn: "2026-04-21", notes: "", color: "#ec4899" },
-]
+// const MOCK_LEADS: Lead[] = [
+//   { id: "L-1001", name: "Murali Prakash S", org: "Murali & Co",      email: "murali@gmail.com",   phone: "6734567183", status: "new",       addedOn: "2026-04-10", notes: "", color: "#4c7ee1" },
+//   { id: "L-1002", name: "Anitha Rajan",     org: "Anitha Pharma",    email: "anitha@gmail.com",   phone: "9876543210", status: "contacted", addedOn: "2026-04-11", notes: "Interests: Pharmacy Suite, Clinic Suite", color: "#8b5cf6" },
+//   { id: "L-1003", name: "Vikram Suresh",    org: "Vikram Clinics",   email: "vikram@gmail.com",   phone: "8765432109", status: "reviewed",  addedOn: "2026-04-12", notes: "", color: "#ec4899" },
+//   { id: "L-1004", name: "Priya Nair",       org: "Priya Health",     email: "priya@gmail.com",    phone: "7654321098", status: "found",     addedOn: "2026-04-13", notes: "", color: "#1ead82" },
+//   { id: "L-1005", name: "Senthil Kumar",    org: "SK Medicals",      email: "senthil@gmail.com",  phone: "6543210987", status: "not_found", addedOn: "2026-04-14", notes: "", color: "#d3a335" },
+//   { id: "L-1006", name: "Deepa Menon",      org: "Deepa Healthcare", email: "deepa@gmail.com",    phone: "9988776655", status: "new",       addedOn: "2026-04-15", notes: "", color: "#06b6d4" },
+//   { id: "L-1007", name: "Arun Chandran",    org: "Arun Hospitals",   email: "arun@gmail.com",     phone: "8877665544", status: "converted", addedOn: "2026-04-16", notes: "", color: "#f97316" },
+//   { id: "L-1008", name: "Kavitha Balu",     org: "Kavitha Pharmacy", email: "kavitha@gmail.com",  phone: "7766554433", status: "new",       addedOn: "2026-04-17", notes: "", color: "#4c7ee1" },
+//   { id: "L-1009", name: "Ravi Shankar",     org: "Ravi Surgicals",   email: "ravi@gmail.com",     phone: "6655443322", status: "archived",  addedOn: "2026-04-18", notes: "", color: "#8b5cf6" },
+//   { id: "L-1010", name: "Meena Pillai",     org: "Meena Medicals",   email: "meena@gmail.com",    phone: "9900112233", status: "new",       addedOn: "2026-04-19", notes: "", color: "#1ead82" },
+//   { id: "L-1011", name: "Suresh Babu",      org: "Suresh Clinics",   email: "suresh@gmail.com",   phone: "8811223344", status: "contacted", addedOn: "2026-04-20", notes: "", color: "#d3a335" },
+//   { id: "L-1012", name: "Lakshmi Venkat",   org: "Lakshmi Stores",   email: "lakshmi@gmail.com",  phone: "7722334455", status: "new",       addedOn: "2026-04-21", notes: "", color: "#ec4899" },
+// ]
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const statusConfig: Record<LeadStatus, { label: string; bg: string; color: string; dot: string }> = {
-  new:       { label: "New",       bg: "rgba(76,126,225,0.12)",  color: "#4c7ee1", dot: "#4c7ee1" },
-  contacted: { label: "Contacted", bg: "rgba(211,163,53,0.12)",  color: "#d3a335", dot: "#d3a335" },
-  reviewed:  { label: "Reviewed",  bg: "rgba(110,107,176,0.12)", color: "#6e6bb0", dot: "#6e6bb0" },
-  found:     { label: "Found",     bg: "rgba(74,171,176,0.12)",  color: "#4aabb0", dot: "#4aabb0" },
-  not_found: { label: "Not Found", bg: "rgba(196,96,111,0.12)",  color: "#c4606f", dot: "#c4606f" },
-  converted: { label: "Converted", bg: "rgba(30,173,130,0.12)",  color: "#1ead82", dot: "#1ead82" },
-  archived:  { label: "Archived",  bg: "rgba(90,96,112,0.12)",   color: "#5a6070", dot: "#5a6070" },
+  "discovery":       { label: "New",       bg: "rgba(76,126,225,0.12)",  color: "#4c7ee1", dot: "#4c7ee1" },
+  "contacted": { label: "Contacted", bg: "rgba(211,163,53,0.12)",  color: "#d3a335", dot: "#d3a335" },
+  "reviewing":  { label: "Reviewed",  bg: "rgba(110,107,176,0.12)", color: "#6e6bb0", dot: "#6e6bb0" },
+  "closed-won":     { label: "Found",     bg: "rgba(74,171,176,0.12)",  color: "#4aabb0", dot: "#4aabb0" },
+  "closed-lost": { label: "Not Found", bg: "rgba(196,96,111,0.12)",  color: "#c4606f", dot: "#c4606f" },
+  // converted: { label: "Converted", bg: "rgba(30,173,130,0.12)",  color: "#1ead82", dot: "#1ead82" },
+  // archived:  { label: "Archived",  bg: "rgba(90,96,112,0.12)",   color: "#5a6070", dot: "#5a6070" },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -60,7 +75,10 @@ const getInitials = (name: string) =>
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LeadsPage() {
-  const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [leads, setLeads] = useState<Lead[]>([])
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | LeadStatus>("all")
   const [period, setPeriod] = useState("all")
@@ -72,6 +90,16 @@ export default function LeadsPage() {
   const [isEditing, setIsEditing] = useState(false)
   // Editable draft inside the view dialog
   const [editDraft, setEditDraft] = useState<Lead | null>(null)
+  // whether the create lead dialog is open
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [createDraft, setCreateDraft] =
+  useState<CreateLeadDraft>({
+    leadName: "",
+    company: "",
+    email: "",
+    phone: "",
+    status: "discovery",
+  })
 
   // New lead dialog
   const [newOpen, setNewOpen] = useState(false)
@@ -79,46 +107,71 @@ export default function LeadsPage() {
   const [nOrg, setNOrg] = useState("")
   const [nEmail, setNEmail] = useState("")
   const [nPhone, setNPhone] = useState("")
-  const [nStatus, setNStatus] = useState<LeadStatus>("new")
+  const [nStatus, setNStatus] = useState<LeadStatus>("discovery")
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const stats = useMemo(() => ({
     total:     leads.length,
-    newLeads:  leads.filter((l) => l.status === "new").length,
-    contacted: leads.filter((l) => l.status === "contacted" || l.status === "reviewed").length,
-    converted: leads.filter((l) => l.status === "converted").length,
+    newLeads:  leads.filter((l) => l.status === "discovery").length,
+    contacted: leads.filter((l) => l.status === "contacted" || l.status === "reviewing").length,
+    converted: leads.filter((l) => l.status === "closed-won").length,
   }), [leads])
 
   const tabCounts = useMemo(() => ({
-    all:      leads.filter((l) => l.status !== "archived").length,
-    archived: leads.filter((l) => l.status === "archived").length,
-    existing: leads.filter((l) => l.status === "converted").length,
+    all:      leads.length,
+    archived: leads.filter((l) => l.status === "closed-won" || l.status === "closed-lost").length,
+    existing: leads.filter((l) => l.status !== "closed-won" && l.status !== "closed-lost").length,
   }), [leads])
 
-  // ── Filtered rows ──────────────────────────────────────────────────────────
-  const filtered = useMemo(() => leads.filter((l) => {
-    const q = `${l.id} ${l.name} ${l.org} ${l.email} ${l.phone}`.toLowerCase()
+  // // ── Filtered rows ──────────────────────────────────────────────────────────
+  // const filtered = useMemo(() => leads.filter((l) => {
+  //   const q = `${l.id} ${l.leadName} ${l.company} ${l.email} ${l.phone}`.toLowerCase()
+  //   const mQ = q.includes(query.toLowerCase())
+  //   const mS = statusFilter === "all" || l.status === statusFilter
+  //   const mT = activeTab === "archived" ? l.status === "archived"
+  //            : activeTab === "existing"  ? l.status === "converted"
+  //            : l.status !== "archived"
+  //   return mQ && mS && mT
+  // }), [leads, query, statusFilter, activeTab])
+
+  // --- New Filtered rows
+
+  const filtered = useMemo(() =>
+  leads.filter((l) => {
+    const q = `${l.id} ${l.leadName} ${l.company} ${l.email} ${l.phone}`.toLowerCase()
+
     const mQ = q.includes(query.toLowerCase())
-    const mS = statusFilter === "all" || l.status === statusFilter
-    const mT = activeTab === "archived" ? l.status === "archived"
-             : activeTab === "existing"  ? l.status === "converted"
-             : l.status !== "archived"
+
+    const mS =
+      statusFilter === "all" ||
+      l.status === statusFilter
+
+    const mT =
+      activeTab === "archived"
+        ? l.status === "closed-won" || l.status === "closed-lost"
+        : activeTab === "existing"
+        ? l.status !== "closed-won" && l.status !== "closed-lost"
+        : true
+
     return mQ && mS && mT
-  }), [leads, query, statusFilter, activeTab])
+  }),
+  [leads, query, statusFilter, activeTab]
+)
+// -----
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleCreate = () => {
     if (!nName.trim() || !nEmail.trim()) return
     const lead: Lead = {
       id: `L-${1000 + leads.length + 1}`,
-      name: nName, org: nOrg, email: nEmail, phone: nPhone, status: nStatus,
-      addedOn: new Date().toISOString().slice(0, 10),
-      notes: "",
+      leadName: nName, company: nOrg, email: nEmail, phone: nPhone, status: nStatus,
+      createdDate: new Date().toISOString().slice(0, 10),
+      //notes: "",
       color: AVATAR_COLORS[leads.length % AVATAR_COLORS.length],
     }
     setLeads((p) => [lead, ...p])
     setNewOpen(false)
-    setNName(""); setNOrg(""); setNEmail(""); setNPhone(""); setNStatus("new")
+    setNName(""); setNOrg(""); setNEmail(""); setNPhone(""); setNStatus("discovery")
   }
 
   // Open view dialog
@@ -136,13 +189,151 @@ export default function LeadsPage() {
   }
 
   // Save edits and exit edit mode
-  const saveEdit = () => {
-    if (!editDraft) return
-    setLeads((p) => p.map((l) => l.id === editDraft.id ? editDraft : l))
-    setViewingLead({ ...editDraft })
+  // const saveEdit = () => {
+  //   if (!editDraft) return
+  //   setLeads((p) => p.map((l) => l.id === editDraft.id ? editDraft : l))
+  //   setViewingLead({ ...editDraft })
+  //   setIsEditing(false)
+  //   setEditDraft(null)
+  // }
+const saveEdit = async () => {
+  if (!editDraft) return
+
+  try {
+    const supabase = getSupabaseClient()
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const token = session?.access_token
+
+    if (!token) {
+      throw new Error("Please sign in.")
+    }
+
+    const response = await fetch(
+      `/api/leads/${editDraft.id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          leadName: editDraft.leadName,
+          company: editDraft.company,
+          email: editDraft.email,
+          phone: editDraft.phone,
+          status: editDraft.status,
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json()
+
+      throw new Error(
+        errorData.error ?? "Failed to update lead."
+      )
+    }
+
+    const data = await response.json()
+
+    const updatedLead = data.lead ?? editDraft
+
+    setLeads((current) =>
+      current.map((lead) =>
+        lead.id === updatedLead.id
+          ? updatedLead
+          : lead
+      )
+    )
+
+    setViewingLead(updatedLead)
     setIsEditing(false)
     setEditDraft(null)
+  } catch (error) {
+    console.error(error)
+    setError(
+      error instanceof Error
+        ? error.message
+        : "Failed to update lead."
+    )
   }
+}
+
+// ----- create lead handler
+const createLead = async () => {
+  try {
+    const supabase = getSupabaseClient()
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const token = session?.access_token
+
+    if (!token) {
+      throw new Error("Please sign in.")
+    }
+
+    const response = await fetch(
+      "/api/leads",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          leadName: createDraft.leadName,
+          company: createDraft.company,
+          email: createDraft.email,
+          phone: createDraft.phone,
+          status: createDraft.status,
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json()
+
+      throw new Error(
+        errorData.error ?? "Failed to create lead."
+      )
+    }
+
+    const data = await response.json()
+
+    const createdLead = data.lead as Lead
+
+    setLeads((current) => [
+      createdLead,
+      ...current,
+    ])
+
+    setCreateDraft({
+      leadName: "",
+      company: "",
+      email: "",
+      phone: "",
+      status: "discovery",
+    })
+
+    setIsCreateOpen(false)
+  } catch (error) {
+    console.error(error)
+
+    setError(
+      error instanceof Error
+        ? error.message
+        : "Failed to create lead."
+    )
+  }
+}
+
+//-------------
 
   // Cancel edit mode
   const cancelEdit = () => {
@@ -165,11 +356,130 @@ export default function LeadsPage() {
     setLeads((p) => p.map((l) => l.id === updated.id ? updated : l))
   }
 
-  const handleDeleteLead = (id: string) => {
-    setLeads((p) => p.filter((l) => l.id !== id))
+  // const handleDeleteLead = (id: string) => {
+  //   setLeads((p) => p.filter((l) => l.id !== id))
+  //   closeView()
+  // }
+const handleDeleteLead = async (id: string) => {
+  try {
+    const supabase = getSupabaseClient()
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const token = session?.access_token
+
+    if (!token) {
+      throw new Error("Please sign in.")
+    }
+
+    const response = await fetch(
+      `/api/leads/${id}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json()
+
+      throw new Error(
+        errorData.error ?? "Failed to delete lead."
+      )
+    }
+
+    setLeads((current) =>
+      current.filter(
+        (lead) => lead.id !== id
+      )
+    )
+
     closeView()
+  } catch (error) {
+    console.error(error)
+
+    setError(
+      error instanceof Error
+        ? error.message
+        : "Failed to delete lead."
+    )
+  }
+}
+
+
+  const closeCreateModal = () => {
+  setIsCreateOpen(false)
+
+  setCreateDraft({
+    leadName: "",
+    company: "",
+    email: "",
+    phone: "",
+    status: "discovery",
+  })
+}
+
+  // --- data fetching from supabase
+
+  useEffect(() => {
+  async function loadLeads(showLoader = false) {
+    if (showLoader) {
+      setLoading(true)
+    }
+
+    try {
+      setError(null)
+
+      const supabase = getSupabaseClient()
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const token = session?.access_token
+
+      if (!token) {
+        throw new Error("Please sign in to load leads.")
+      }
+
+      const response = await fetch("/api/leads", {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const responseData = (await response.json()) as {
+          error?: string
+        }
+
+        throw new Error(
+          responseData.error ?? "Failed to load leads."
+        )
+      }
+
+      const data = (await response.json()) as {
+        leads: Lead[]
+        status?: string
+      }
+
+      setLeads(data.leads ?? [])
+    } catch {
+      setError("Failed to load leads.")
+    } finally {
+      setLoading(false)
+    }
   }
 
+  loadLeads(true)
+}, [])
+
+// ----------------
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -232,12 +542,12 @@ export default function LeadsPage() {
             onChange={(e) => setStatusFilter(e.target.value as "all" | LeadStatus)}
           >
             <option value="all">All Status</option>
-            <option value="new">New</option>
+            <option value="discovery">Discovery</option>
             <option value="contacted">Contacted</option>
-            <option value="reviewed">Reviewed</option>
-            <option value="found">Found</option>
-            <option value="not_found">Not Found</option>
-            <option value="converted">Converted</option>
+            <option value="reviewing">Reviewed</option>
+            <option value="closed-won">Found</option>
+            <option value="closed-lost">Not Found</option>
+            {/* <option value="converted">Converted</option> */}
           </select>
           <select className="lp-select" value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="all">All time</option>
@@ -245,6 +555,19 @@ export default function LeadsPage() {
             <option value="90d">Last 90 days</option>
             <option value="1y">Last year</option>
           </select>
+          <CreateLeadButton
+  onClick={() => {
+    setCreateDraft({
+      leadName: "",
+      company: "",
+      email: "",
+      phone: "",
+      status: "discovery",
+    })
+
+    setIsCreateOpen(true)
+  }}
+/>
         </div>
 
         {/* ── Table ──────────────────────────────────────────────────────── */}
@@ -278,11 +601,11 @@ export default function LeadsPage() {
                         className="lp-avatar"
                         style={{ background: `${lead.color}22`, color: lead.color }}
                       >
-                        {getInitials(lead.name)}
+                        {getInitials(lead.leadName)}
                       </div>
                       <div>
-                        <div className="lp-name">{lead.name}</div>
-                        <div className="lp-org">{lead.org}</div>
+                        <div className="lp-name">{lead.leadName}</div>
+                        <div className="lp-org">{lead.company}</div>
                       </div>
                     </div>
                   </td>
@@ -301,7 +624,7 @@ export default function LeadsPage() {
                       {statusConfig[lead.status].label}
                     </span>
                   </td>
-                  <td className="lp-muted">{lead.addedOn}</td>
+                  <td className="lp-muted">{lead.createdDate}</td>
                   <td>
                     <div className="lp-actions">
                       <button
@@ -341,6 +664,18 @@ export default function LeadsPage() {
           cancelEdit={cancelEdit}
         />
       )}
+
+      {/* ── Create Lead Modal ──────────────────────────────────────────────────── */}
+    
+
+      {isCreateOpen && (
+       <CreateLeadModal
+  createDraft={createDraft}
+  setCreateDraft={setCreateDraft}
+  saveCreate={createLead}
+  onClose={closeCreateModal}
+/>
+        )}
 
       {/* ── New Lead Dialog ──────────────────────────────────────────────────── */}
     

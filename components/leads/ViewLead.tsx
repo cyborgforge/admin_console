@@ -82,7 +82,7 @@ export default function ViewLead({
             {/* LEAD NAME */}
             <div className="lp-view-field">
               <div className="lp-view-field-label">LEAD NAME</div>
-              <div className="lp-view-field-val">{lead.name}</div>
+              <div className="lp-view-field-val">{lead.leadName}</div>
             </div>
 
             {/* EMAIL */}
@@ -100,7 +100,7 @@ export default function ViewLead({
             {/* COMPANY */}
             <div className="lp-view-field">
               <div className="lp-view-field-label">COMPANY</div>
-              <div className="lp-view-field-val">{lead.org || "—"}</div>
+              <div className="lp-view-field-val">{lead.company || "—"}</div>
             </div>
 
             {/* INDUSTRY — static */}
@@ -112,7 +112,7 @@ export default function ViewLead({
             {/* CREATED AT — read-only */}
             <div className="lp-view-field">
               <div className="lp-view-field-label">CREATED AT</div>
-              <div className="lp-view-field-val">{lead.addedOn}</div>
+              <div className="lp-view-field-val">{lead.createdDate}</div>
             </div>
 
             {/* STATUS badge */}
@@ -137,9 +137,9 @@ export default function ViewLead({
           {/* NOTES */}
           <div className="lp-view-notes-field">
             <div className="lp-view-field-label">NOTES</div>
-            <div className="lp-view-field-val lp-view-notes-val">
+            {/* <div className="lp-view-field-val lp-view-notes-val">
               {lead.notes || "—"}
-            </div>
+            </div> */}
           </div>
         </div>
 

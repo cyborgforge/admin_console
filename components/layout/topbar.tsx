@@ -72,7 +72,7 @@ export function Topbar() {
         {isInvoices ? <NewInvoiceDialog triggerClassName="btn btn-primary" /> : null}
         {isSubscriptions ? <AddSubscriptionDialog triggerClassName="btn btn-primary" /> : null}
         {isAccounts ? <RecordPaymentDialog triggerClassName="btn btn-ghost" /> : null}
-        {isLeads ? <RecordPaymentDialog triggerClassName="btn btn-ghost" /> : null}
+        {/* {isLeads ? <RecordPaymentDialog triggerClassName="btn btn-ghost" /> : null} */}
         
       </div>
     </header>
