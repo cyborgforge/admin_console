@@ -2,8 +2,12 @@ import { NextResponse } from "next/server"
 
 import { getSupabaseServerClient } from "@/lib/supabaseServer"
 
-const DEALS_TABLE =
-  process.env.SUPABASE_DEALS_TABLE ?? "deals"
+const DEALS_TABLE = process.env.SUPABASE_DEALS_TABLE ?? "deals"
+const CLIENTS_TABLE = process.env.SUPABASE_CLIENTS_TABLE ?? "clients"
+const CONTACTS_TABLE = process.env.SUPABASE_CONTACTS_TABLE ?? "contacts"
+const DEAL_PRODUCT_MODULES_TABLE = process.env.SUPABASE_DEAL_PRODUCT_MODULES_TABLE ?? "deal_product_modules"
+const DEAL_PRODUCT_SERVICES_TABLE = process.env.SUPABASE_DEAL_PRODUCT_SERVICES_TABLE ?? "deal_product_services"
+
 
 type DealStage =
   | "new"
@@ -336,22 +340,143 @@ export async function GET(
     return authContext.errorResponse!
   }
 
-  const { data, error } =
-    await authContext.supabase
-      .from(DEALS_TABLE)
-      .select("*")
-      .eq("id", id)
-      .single()
+  const supabase = authContext.supabase
 
-  if (error || !data) {
+  // Fetch deal first to obtain client_id
+  const {
+    data: dealData,
+    error: dealError,
+  } = await supabase
+    .from(DEALS_TABLE)
+    .select(`
+      *,
+      client:clients (
+        id,
+        company_name
+      ),
+      primary_contact:contacts (
+        id,
+        name
+      )
+    `)
+    .eq("id", id)
+    .single()
+
+  if (dealError || !dealData) {
     return NextResponse.json(
-      { error: "Deal not found." },
+      {
+        error: "Deal not found.",
+      },
       { status: 404 }
     )
   }
 
+  const clientId = dealData.client_id
+
+  const [
+    clientResult,
+    contactsResult,
+    modulesResult,
+    servicesResult,
+  ] = await Promise.all([
+    // Client details
+    supabase
+      .from(CLIENTS_TABLE)
+      .select("*")
+      .eq("id", clientId)
+      .single(),
+
+    // All contacts for this client
+    supabase
+      .from(CONTACTS_TABLE)
+      .select("*")
+      .eq("client_id", clientId)
+      .order("created_at", {
+        ascending: false,
+      }),
+
+    // Deal product modules
+    supabase
+      .from(DEAL_PRODUCT_MODULES_TABLE)
+      .select(`
+        *,
+        product_module:product_modules (
+          id,
+          product_code,
+          product_name
+        )
+      `)
+      .eq("deal_id", id)
+      .order("created_at", {
+        ascending: false,
+      }),
+
+    // Deal product services
+    supabase
+      .from(DEAL_PRODUCT_SERVICES_TABLE)
+      .select(`
+        *,
+        product_service:product_services (
+          id,
+          service_code,
+          service_name
+        )
+      `)
+      .eq("deal_id", id)
+      .order("created_at", {
+        ascending: false,
+      }),
+  ])
+
+  if (clientResult.error) {
+    return NextResponse.json(
+      {
+        error: clientResult.error.message,
+      },
+      { status: 400 }
+    )
+  }
+
+  if (contactsResult.error) {
+    return NextResponse.json(
+      {
+        error: contactsResult.error.message,
+      },
+      { status: 400 }
+    )
+  }
+
+  if (modulesResult.error) {
+    return NextResponse.json(
+      {
+        error: modulesResult.error.message,
+      },
+      { status: 400 }
+    )
+  }
+
+  if (servicesResult.error) {
+    return NextResponse.json(
+      {
+        error: servicesResult.error.message,
+      },
+      { status: 400 }
+    )
+  }
+
   return NextResponse.json({
-    deal: data,
+    deal: dealData,
+
+    client: clientResult.data,
+
+    contacts:
+      contactsResult.data ?? [],
+
+    productModules:
+      modulesResult.data ?? [],
+
+    productServices:
+      servicesResult.data ?? [],
   })
 }
 

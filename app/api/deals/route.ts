@@ -308,7 +308,17 @@ export async function GET(request: Request) {
 
     let query = authContext.supabase
       .from(DEALS_TABLE)
-      .select("*")
+      .select(`
+                *,
+                client:clients (
+                  id,
+                  company_name
+                ),
+                primary_contact:contacts (
+                  id,
+                  name
+                )
+        `)
 
     if (client_id) {
       query = query.eq("client_id", client_id)
@@ -344,7 +354,7 @@ export async function GET(request: Request) {
       "created_at",
       { ascending: false }
     )
-
+    console.log("Fetched deals:", data, error)
     if (error) {
       return NextResponse.json(
         {
