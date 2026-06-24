@@ -175,7 +175,16 @@ export async function GET(request: Request) {
 
     let query = authContext.supabase
       .from(CONTACTS_TABLE)
-      .select("*")
+       .select(`
+    *,
+    clients (
+      id,
+      company_name
+    )
+  `)
+  .order("created_at", {
+    ascending: false,
+  })
 
     if (client_id) {
       query = query.eq("client_id", client_id)
