@@ -100,7 +100,7 @@ const navSections = [
     title: "Support",
     items: [
       {
-        href: "/", //"/support",
+        href: "/support", //"/support",
         label: "Support ",
         icon: LifeBuoy,
       },
