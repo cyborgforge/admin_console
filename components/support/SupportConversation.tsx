@@ -8,6 +8,7 @@ interface SupportConversationProps {
   ticket: Ticket
   messages: Message[]
   onSendResponse?: (text: string) => Promise<void> | void
+  onSendResponseclose?: (text: string) => Promise<void> | void
 }
 
 function formatClosedDate(dateStr: string | null): string {
@@ -23,7 +24,12 @@ function formatClosedDate(dateStr: string | null): string {
   }
 }
 
-export function SupportConversation({ ticket, messages, onSendResponse }: SupportConversationProps) {
+export function SupportConversation({
+  ticket,
+  messages,
+  onSendResponse,
+  onSendResponseclose,
+}: SupportConversationProps) {
   const isClosed = ticket.status === "closed" || ticket.status === "resolved" || ticket.status === "rejected"
   const clientName = ticket.user?.name ?? "Client"
 
@@ -68,9 +74,10 @@ export function SupportConversation({ ticket, messages, onSendResponse }: Suppor
         </div>
       ) : (
         <SupportResponseBox
-          clientName={clientName}
-          onSendResponse={onSendResponse}
-        />
+  clientName={clientName}
+  onSendResponse={onSendResponse}
+  onSendResponseclose={onSendResponseclose}
+/>
       )}
     </div>
   )

@@ -69,10 +69,10 @@ export function CreateTicketDialog({ open, onClose, onCreated }: CreateTicketDia
       setError("Problem statement is required.")
       return
     }
-    if (!form.product_id.trim()) {
-      setError("Product ID is required.")
-      return
-    }
+    // if (!form.product_id.trim()) {
+    //   setError("Product ID is required.")
+    //   return
+    // }
 
     setSaving(true)
     setError(null)
@@ -80,7 +80,7 @@ export function CreateTicketDialog({ open, onClose, onCreated }: CreateTicketDia
     try {
       const ticket = await createSupportTicket({
         user_id: user.id,
-        product_id: form.product_id.trim(),
+      product_id: null,
         subject: form.subject.trim(),
         problem_statement: form.problem_statement.trim(),
         priority: form.priority,

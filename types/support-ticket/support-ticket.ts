@@ -37,8 +37,8 @@ export interface SupportTicketAttachment {
 export interface SupportTicket {
   id: string
 
-  user_id: string
-  product_id: string
+  user_id: string|null
+  product_id: string |null
 
   subject: string
 
@@ -83,7 +83,7 @@ export interface SupportTicket {
 export interface CreateSupportTicketPayload {
   user_id: string
 
-  product_id: string
+  product_id: string|null
 
   subject: string
 

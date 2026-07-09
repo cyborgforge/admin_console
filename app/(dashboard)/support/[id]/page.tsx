@@ -60,7 +60,7 @@ export default function TicketDetailPage({ params }: PageProps) {
   }, [loadAll])
 
   // ── Send a reply (and close ticket) ─────────────────────────────────────
-  const handleSendResponse = async (text: string) => {
+  const handleSendResponseclose = async (text: string) => {
     if (!ticket) return
     try {
       const newMsg = await createSupportTicketMessage(ticket.id, {
@@ -79,6 +79,26 @@ export default function TicketDetailPage({ params }: PageProps) {
     }
   }
 
+  // ── Send a reply  ─────────────────────────────────────
+  const handleSendResponse = async (text: string) => {
+  if (!ticket) return
+
+  try {
+    const newMsg = await createSupportTicketMessage(ticket.id, {
+      sender_type: "support_staff",
+      sender_id: user.id,
+      content: text,
+    })
+
+    setMessages((prev) => [...prev, newMsg])
+
+    toast.success("Response sent.")
+  } catch (err) {
+    toast.error(
+      err instanceof Error ? err.message : "Failed to send response."
+    )
+  }
+}
   // ── Change ticket status ─────────────────────────────────────────────────
   const handleStatusChange = async (status: Ticket["status"]) => {
     if (!ticket) return
@@ -151,6 +171,7 @@ export default function TicketDetailPage({ params }: PageProps) {
             <SupportConversation
               ticket={ticket}
               messages={messages}
+              onSendResponseclose={handleSendResponseclose}
               onSendResponse={handleSendResponse}
             />
 

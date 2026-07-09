@@ -43,11 +43,17 @@ export function SupportTicketHeader({ ticket }: SupportTicketHeaderProps) {
           {formatPriorityLabel(ticket.priority)} Priority
         </span>
       </div>
-      <p className="text-sm text-[#8b95a8]">
-        {ticket.subject}
-        <span className="mx-1.5 text-[#4f5a6a]">•</span>
-        <span className="text-[#e8eaf0] font-medium">{clientName}</span>
-      </p>
+     <p className="text-sm text-[#8b95a8]">
+  {ticket.subject}
+  <span className="mx-1.5 text-[#4f5a6a]">•</span>
+  <span className="text-[#e8eaf0] font-medium">{clientName}</span>
+</p>
+
+{ticket.problem_statement && (
+  <p className="mt-2 max-w-3xl text-sm font-black leading-6 text-[#8b95a8] whitespace-pre-wrap">
+    {ticket.problem_statement}
+  </p>
+)}
     </div>
   )
 }

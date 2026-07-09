@@ -81,9 +81,15 @@ export function SupportTicketCard({ ticket, onClick }: SupportTicketCardProps) {
         </span>
       </div>
 
-      <div className="text-sm font-semibold text-[#e8eaf0] line-clamp-1">
-        {ticket.subject}
-      </div>
+     <div className="text-sm font-semibold text-[#e8eaf0] line-clamp-1">
+  {ticket.subject}
+</div>
+
+{ticket.problem_statement && (
+  <div className="text-xs text-[#8b95a8] line-clamp-2 mt-1">
+    {ticket.problem_statement}
+  </div>
+)}
 
       <div className="flex justify-between items-center text-xs pt-1 border-t border-[#2a3040]/50">
         <span className="text-[#8b95a8]">{clientName}</span>

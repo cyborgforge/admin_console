@@ -73,7 +73,7 @@ export async function getSupportTicket(id: string): Promise<Ticket> {
 
 export interface CreateTicketPayload {
   user_id: string
-  product_id: string
+  product_id: string|null
   subject: string
   problem_statement: string
   priority?: Ticket["priority"]

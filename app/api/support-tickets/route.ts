@@ -173,11 +173,11 @@ function normalizeCreatePayload(
       payload.product_id
     )
 
-  if (!product_id) {
-    throw new Error(
-      "product_id is required."
-    )
-  }
+  // if (!product_id) {
+  //   throw new Error(
+  //     "product_id is required."
+  //   )
+  // }
 
   const subject =
     readString(

@@ -6,9 +6,14 @@ import { Bold, Italic, Paperclip, Loader2 } from "lucide-react"
 interface SupportResponseBoxProps {
   clientName: string
   onSendResponse?: (text: string) => Promise<void> | void
+  onSendResponseclose?: (text: string) => Promise<void> | void
 }
 
-export function SupportResponseBox({ clientName, onSendResponse }: SupportResponseBoxProps) {
+export function SupportResponseBox({
+  clientName,
+  onSendResponse,
+  onSendResponseclose,
+}: SupportResponseBoxProps) {
   const [text, setText] = useState("")
   const [sending, setSending] = useState(false)
 
@@ -23,6 +28,19 @@ export function SupportResponseBox({ clientName, onSendResponse }: SupportRespon
       setSending(false)
     }
   }
+  const handleSendAndClose = async () => {
+  const trimmed = text.trim()
+  if (!trimmed || sending) return
+
+  setSending(true)
+
+  try {
+    await onSendResponseclose?.(trimmed)
+    setText("")
+  } finally {
+    setSending(false)
+  }
+}
 
   return (
     <div className="flex flex-col gap-2.5 mt-6">
@@ -64,16 +82,27 @@ export function SupportResponseBox({ clientName, onSendResponse }: SupportRespon
               <Paperclip size={15} />
             </button>
           </div>
+<div className="flex items-center gap-2">
+  <button
+    type="button"
+    onClick={() => void handleSend()}
+    disabled={sending || !text.trim()}
+    className="px-4 py-1.5 border border-[#2a3040] hover:bg-[#252b34] rounded text-xs font-semibold text-[#e8eaf0] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+  >
+    {sending && <Loader2 size={12} className="animate-spin" />}
+    Send
+  </button>
 
-          <button
-            type="button"
-            onClick={() => void handleSend()}
-            disabled={sending || !text.trim()}
-            className="px-4 py-1.5 bg-[#3b82f6] hover:bg-[#2563eb] active:translate-y-px rounded text-xs font-semibold text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-          >
-            {sending && <Loader2 size={12} className="animate-spin" />}
-            Send &amp; Close Ticket
-          </button>
+  <button
+    type="button"
+    onClick={() => void handleSendAndClose()}
+    disabled={sending || !text.trim()}
+    className="px-4 py-1.5 bg-[#3b82f6] hover:bg-[#2563eb] active:translate-y-px rounded text-xs font-semibold text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+  >
+    {sending && <Loader2 size={12} className="animate-spin" />}
+    Send &amp; Close Ticket
+  </button>
+</div>
         </div>
       </div>
     </div>
