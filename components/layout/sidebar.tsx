@@ -72,7 +72,7 @@ const navSections = [
     title: "Client Operations",
     items: [
       {
-        href:"/", // "/client-onboarding",
+        href: "/client-onboarding",
         label: "Client Onboarding",
         icon: ClipboardList,
       },

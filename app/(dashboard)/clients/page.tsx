@@ -204,8 +204,8 @@ export default function ClientsPage() {
       {view === "grid" ? (
         <div id="clients-grid">
           {filteredClients.map((client) => (
-            <Link href={`/clients/${client.id}`}>
-            <ClientCard key={client.id} client={client} onClick={() => setSelectedClient(client)} />
+            <Link key={client.id} href={`/clients/${client.id}`}>
+              <ClientCard client={client} onClick={() => setSelectedClient(client)} />
             </Link>
           ))}
         </div>
