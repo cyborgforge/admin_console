@@ -7,7 +7,7 @@ export const onboardingClientsConfig: ResourceConfig = {
   fields: {
     client_id: { type: "string", required: true },
     start_date: { type: "string", nullable: true },
-    finish_date: { type: "string", nullable: true },
+    due_date: { type: "string", nullable: true },
     status: { type: "status", defaultValue: "Pending" },
     forms_filled: { type: "number", defaultValue: 0 },
     forms_total: { type: "number", defaultValue: 0 },

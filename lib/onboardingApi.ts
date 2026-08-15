@@ -242,6 +242,55 @@ export async function requireAuthenticatedRequest(
   }
 }
 
+export async function recalculateOnboardingCounts(
+  supabase: SupabaseServerClient,
+  onboardingId: string
+) {
+  const [formsRes, docsRes] = await Promise.all([
+    supabase
+      .from("onboarding_forms_assigned")
+      .select("id, status")
+      .eq("onboarding_id", onboardingId),
+    supabase
+      .from("onboarding_documents_assigned")
+      .select("id, status")
+      .eq("onboarding_id", onboardingId),
+  ])
+
+  const forms = formsRes.data ?? []
+  const docs = docsRes.data ?? []
+
+  const forms_total = forms.length
+  const forms_filled = forms.filter(
+    (f: { status?: string }) =>
+      f.status === "Approved" || f.status === "Accepted"
+  ).length
+
+  const documents_total = docs.length
+  const documents_filled = docs.filter(
+    (d: { status?: string }) =>
+      d.status === "Approved" || d.status === "Accepted"
+  ).length
+
+  await supabase
+    .from("onboarding_clients")
+    .update({
+      forms_total,
+      forms_filled,
+      documents_total,
+      documents_filled,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", onboardingId)
+
+  return {
+    forms_total,
+    forms_filled,
+    documents_total,
+    documents_filled,
+  }
+}
+
 async function requireRecordExists(
   supabase: SupabaseServerClient,
   table: string,
@@ -372,6 +421,36 @@ export function createCollectionHandlers(
           config
         )
 
+        if (config.table === "onboarding_forms_response" && payload.form_assigned_id) {
+          const { data: existing } = await authContext.supabase
+            .from("onboarding_forms_response")
+            .select("version_number")
+            .eq("form_assigned_id", payload.form_assigned_id)
+            .order("version_number", { ascending: false })
+            .limit(1)
+
+          if (!body.version_number && existing && existing.length > 0) {
+            payload.version_number = (existing[0].version_number ?? 0) + 1
+          } else if (!body.version_number) {
+            payload.version_number = 1
+          }
+        }
+
+        if (config.table === "onboarding_documents_response" && payload.document_assigned_id) {
+          const { data: existing } = await authContext.supabase
+            .from("onboarding_documents_response")
+            .select("version_number")
+            .eq("document_assigned_id", payload.document_assigned_id)
+            .order("version_number", { ascending: false })
+            .limit(1)
+
+          if (!body.version_number && existing && existing.length > 0) {
+            payload.version_number = (existing[0].version_number ?? 0) + 1
+          } else if (!body.version_number) {
+            payload.version_number = 1
+          }
+        }
+
         const { data, error } =
           await authContext.supabase
             .from(config.table)
@@ -388,6 +467,58 @@ export function createCollectionHandlers(
             },
             { status: 400 }
           )
+        }
+
+        try {
+          if (config.table === "onboarding_forms_response") {
+            const resp: any = data
+            if (resp.form_assigned_id) {
+              await authContext.supabase
+                .from("onboarding_forms_assigned")
+                .update({
+                  status: resp.status ?? "Pending",
+                  current_submission_id: resp.id,
+                  completed_at: resp.status === "Approved" ? new Date().toISOString() : null,
+                })
+                .eq("id", resp.form_assigned_id)
+
+              const { data: assignedRec } = await authContext.supabase
+                .from("onboarding_forms_assigned")
+                .select("onboarding_id")
+                .eq("id", resp.form_assigned_id)
+                .maybeSingle()
+
+              if (assignedRec?.onboarding_id) {
+                await recalculateOnboardingCounts(authContext.supabase, assignedRec.onboarding_id)
+              }
+            }
+          }
+
+          if (config.table === "onboarding_documents_response") {
+            const resp: any = data
+            if (resp.document_assigned_id) {
+              await authContext.supabase
+                .from("onboarding_documents_assigned")
+                .update({
+                  status: resp.status ?? "Pending",
+                  current_submission_id: resp.id,
+                  completed_at: resp.status === "Approved" ? new Date().toISOString() : null,
+                })
+                .eq("id", resp.document_assigned_id)
+
+              const { data: assignedRec } = await authContext.supabase
+                .from("onboarding_documents_assigned")
+                .select("onboarding_id")
+                .eq("id", resp.document_assigned_id)
+                .maybeSingle()
+
+              if (assignedRec?.onboarding_id) {
+                await recalculateOnboardingCounts(authContext.supabase, assignedRec.onboarding_id)
+              }
+            }
+          }
+        } catch (postErr) {
+          console.error("Failed post propagation:", postErr)
         }
 
         return NextResponse.json(
@@ -614,11 +745,15 @@ export function createStatusHandler(
       }
 
       if (
-        body.status === "Approved" &&
-        "finish_date" in config.fields
+        body.due_date !== undefined &&
+        "due_date" in config.fields
       ) {
-        updateData.finish_date =
-          new Date().toISOString()
+        updateData.due_date = normalizeValue(
+          "due_date",
+          body.due_date,
+          { type: "string", nullable: true },
+          false
+        )
       }
 
       if (
@@ -654,47 +789,39 @@ export function createStatusHandler(
         )
       }
 
-      // If this is a response table, propagate status change to the assigned item
+      // If this is a response or assigned table, propagate status change to the assigned item & client
       try {
         if (config.table === "onboarding_forms_response") {
           const resp: any = data
           const assignedId = resp.form_assigned_id
 
           if (assignedId) {
-            // Update the assigned form's status and current_submission_id
+            const { data: allResponses } = await authContext.supabase
+              .from("onboarding_forms_response")
+              .select("id, status, version_number, created_at")
+              .eq("form_assigned_id", assignedId)
+              .order("version_number", { ascending: false })
+
+            const latestResponse = allResponses?.[0] ?? resp
+            const targetStatus = latestResponse.status ?? "Pending"
+
             await authContext.supabase
               .from("onboarding_forms_assigned")
               .update({
-                status: resp.status,
-                current_submission_id: resp.id,
-                ...(resp.status === "Approved" && { completed_at: new Date().toISOString() }),
+                status: targetStatus,
+                current_submission_id: latestResponse.id,
+                completed_at: targetStatus === "Approved" ? new Date().toISOString() : null,
               })
               .eq("id", assignedId)
 
-            // Update onboarding client's forms_filled if approved
-            if (resp.status === "Approved") {
-              const { data: assignedRec } = await authContext.supabase
-                .from("onboarding_forms_assigned")
-                .select("onboarding_id")
-                .eq("id", assignedId)
-                .maybeSingle()
+            const { data: assignedRec } = await authContext.supabase
+              .from("onboarding_forms_assigned")
+              .select("onboarding_id")
+              .eq("id", assignedId)
+              .maybeSingle()
 
-              const onboardingId = assignedRec?.onboarding_id
-
-              if (onboardingId) {
-                const { data: onboardingRec } = await authContext.supabase
-                  .from("onboarding_clients")
-                  .select("forms_filled")
-                  .eq("id", onboardingId)
-                  .maybeSingle()
-
-                const currentFilled = (onboardingRec?.forms_filled as number) ?? 0
-
-                await authContext.supabase
-                  .from("onboarding_clients")
-                  .update({ forms_filled: currentFilled + 1 })
-                  .eq("id", onboardingId)
-              }
+            if (assignedRec?.onboarding_id) {
+              await recalculateOnboardingCounts(authContext.supabase, assignedRec.onboarding_id)
             }
           }
         }
@@ -704,39 +831,44 @@ export function createStatusHandler(
           const assignedId = resp.document_assigned_id
 
           if (assignedId) {
+            const { data: allResponses } = await authContext.supabase
+              .from("onboarding_documents_response")
+              .select("id, status, version_number, created_at")
+              .eq("document_assigned_id", assignedId)
+              .order("version_number", { ascending: false })
+
+            const latestResponse = allResponses?.[0] ?? resp
+            const targetStatus = latestResponse.status ?? "Pending"
+
             await authContext.supabase
               .from("onboarding_documents_assigned")
               .update({
-                status: resp.status,
-                current_submission_id: resp.id,
-                ...(resp.status === "Approved" && { completed_at: new Date().toISOString() }),
+                status: targetStatus,
+                current_submission_id: latestResponse.id,
+                completed_at: targetStatus === "Approved" ? new Date().toISOString() : null,
               })
               .eq("id", assignedId)
 
-            if (resp.status === "Approved") {
-              const { data: assignedRec } = await authContext.supabase
-                .from("onboarding_documents_assigned")
-                .select("onboarding_id")
-                .eq("id", assignedId)
-                .maybeSingle()
+            const { data: assignedRec } = await authContext.supabase
+              .from("onboarding_documents_assigned")
+              .select("onboarding_id")
+              .eq("id", assignedId)
+              .maybeSingle()
 
-              const onboardingId = assignedRec?.onboarding_id
-
-              if (onboardingId) {
-                const { data: onboardingRec } = await authContext.supabase
-                  .from("onboarding_clients")
-                  .select("documents_filled")
-                  .eq("id", onboardingId)
-                  .maybeSingle()
-
-                const currentFilled = (onboardingRec?.documents_filled as number) ?? 0
-
-                await authContext.supabase
-                  .from("onboarding_clients")
-                  .update({ documents_filled: currentFilled + 1 })
-                  .eq("id", onboardingId)
-              }
+            if (assignedRec?.onboarding_id) {
+              await recalculateOnboardingCounts(authContext.supabase, assignedRec.onboarding_id)
             }
+          }
+        }
+              await recalculateOnboardingCounts(authContext.supabase, assignedRec.onboarding_id)
+            }
+          }
+        }
+
+        if (config.table === "onboarding_forms_assigned" || config.table === "onboarding_documents_assigned") {
+          const assigned: any = data
+          if (assigned?.onboarding_id) {
+            await recalculateOnboardingCounts(authContext.supabase, assigned.onboarding_id)
           }
         }
       } catch (err) {

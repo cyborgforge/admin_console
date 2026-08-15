@@ -33,7 +33,9 @@ export async function GET(request: Request) {
 
     let query = authContext.supabase
       .from("onboarding_clients")
-      .select("*, client:clients(id, company_name, email, phone, industry, status)")
+      .select(
+        "*, client:clients(id, company_name, email, phone, industry, status), onboarding_forms_assigned(id, status), onboarding_documents_assigned(id, status)"
+      )
 
     const client_id =
       url.searchParams.get("client_id")
@@ -63,8 +65,37 @@ export async function GET(request: Request) {
       )
     }
 
+    const onboarding_clients = (data ?? []).map((item: any) => {
+      const assignedForms = item.onboarding_forms_assigned ?? []
+      const assignedDocs = item.onboarding_documents_assigned ?? []
+
+      const forms_total = assignedForms.length
+      const forms_filled = assignedForms.filter(
+        (f: any) => f.status === "Approved" || f.status === "Accepted"
+      ).length
+
+      const documents_total = assignedDocs.length
+      const documents_filled = assignedDocs.filter(
+        (d: any) => d.status === "Approved" || d.status === "Accepted"
+      ).length
+
+      const {
+        onboarding_forms_assigned,
+        onboarding_documents_assigned,
+        ...rest
+      } = item
+
+      return {
+        ...rest,
+        forms_total,
+        forms_filled,
+        documents_total,
+        documents_filled,
+      }
+    })
+
     return NextResponse.json({
-      onboarding_clients: data ?? [],
+      onboarding_clients,
     })
   } catch (error) {
     return NextResponse.json(

@@ -41,6 +41,8 @@ export async function GET(
     clientResult,
     formsResult,
     documentsResult,
+    branchResult,
+    contactResult,
   ] = await Promise.all([
     authContext.supabase
       .from("clients")
@@ -57,6 +59,18 @@ export async function GET(
       .select("*, document:onboarding_documents_list(*)")
       .eq("onboarding_id", id)
       .order("created_at", { ascending: false }),
+    authContext.supabase
+      .from("branches")
+      .select("*")
+      .eq("client_id", onboardingClient.client_id)
+      .limit(1)
+      .maybeSingle(),
+    authContext.supabase
+      .from("contacts")
+      .select("*")
+      .eq("client_id", onboardingClient.client_id)
+      .limit(1)
+      .maybeSingle(),
   ])
 
   const formIds = (formsResult.data ?? []).map(
@@ -105,11 +119,34 @@ export async function GET(
     )
   }
 
+  const assignedForms = formsResult.data ?? []
+  const assignedDocs = documentsResult.data ?? []
+
+  const forms_total = assignedForms.length
+  const forms_filled = assignedForms.filter(
+    (f: any) => f.status === "Approved" || f.status === "Accepted"
+  ).length
+
+  const documents_total = assignedDocs.length
+  const documents_filled = assignedDocs.filter(
+    (d: any) => d.status === "Approved" || d.status === "Accepted"
+  ).length
+
+  const updatedOnboardingClient = {
+    ...onboardingClient,
+    forms_total,
+    forms_filled,
+    documents_total,
+    documents_filled,
+  }
+
   return NextResponse.json({
-    onboarding_client: onboardingClient,
+    onboarding_client: updatedOnboardingClient,
     client: clientResult.data,
-    assigned_forms: formsResult.data ?? [],
-    assigned_documents: documentsResult.data ?? [],
+    branch: branchResult.data,
+    contact: contactResult.data,
+    assigned_forms: assignedForms,
+    assigned_documents: assignedDocs,
     form_responses: formResponsesResult.data ?? [],
     document_responses:
       documentResponsesResult.data ?? [],

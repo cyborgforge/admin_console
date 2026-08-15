@@ -158,7 +158,7 @@ export default function ClientOnboardingPage() {
               <th>Client</th>
               <th>Status</th>
               <th>Start Date</th>
-              <th>Finish Date</th>
+              <th>Due Date</th>
               <th>Forms</th>
               <th>Documents</th>
               <th>Created</th>
@@ -193,8 +193,8 @@ export default function ClientOnboardingPage() {
                       : "-"}
                   </td>
                   <td className="quote-id">
-                    {item.finish_date
-                      ? new Date(item.finish_date).toLocaleDateString()
+                    {item.due_date
+                      ? new Date(item.due_date).toLocaleDateString()
                       : "-"}
                   </td>
                   <td>

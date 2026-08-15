@@ -3,10 +3,13 @@
 import { use, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 
+import { FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 import { getSupabaseClient } from "@/lib/supabaseClient"
 import type {
   OnboardingClientDetail,
+  OnboardingDocumentAssigned,
   OnboardingFormAssigned,
   OnboardingFormResponse,
 } from "@/types/onboarding"
@@ -21,7 +24,7 @@ type PageProps = {
   params: Promise<{ id: string }>
 }
 
-type Tab = "overview" | "forms" | "activity" | "tickets"
+type Tab = "overview" | "forms" | "documents" | "activity" | "tickets"
 
 const tabContainerStyle: React.CSSProperties = {
   display: "flex",
@@ -55,10 +58,89 @@ export default function ClientOnboardingDetailPage({
   const [activeTab, setActiveTab] = useState<Tab>("overview")
   const [selectedForm, setSelectedForm] =
     useState<OnboardingFormAssigned | null>(null)
+  const [selectedDocument, setSelectedDocument] =
+    useState<OnboardingDocumentAssigned | null>(null)
   const [selectedResponse, setSelectedResponse] =
     useState<OnboardingFormResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [updatingResponseId, setUpdatingResponseId] = useState<string | null>(null)
+
+  async function updateResponseStatus(responseId: string, status: "Approved" | "Rejected") {
+    setUpdatingResponseId(responseId)
+    try {
+      const supabase = getSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const token = session?.access_token
+      if (!token) {
+        toast.error("Please sign in before updating status.")
+        return
+      }
+
+      const res = await fetch(`/api/onboarding-forms-response/${responseId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        toast.error(body?.error ?? "Failed to update response status.")
+        return
+      }
+
+      toast.success(`Response status updated to ${status}`)
+      await loadDetail()
+    } catch {
+      toast.error("An error occurred while updating status.")
+    } finally {
+      setUpdatingResponseId(null)
+    }
+  }
+
+  async function updateDocumentResponseStatus(responseId: string, status: "Approved" | "Rejected") {
+    setUpdatingResponseId(responseId)
+    try {
+      const supabase = getSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const token = session?.access_token
+      if (!token) {
+        toast.error("Please sign in before updating status.")
+        return
+      }
+
+      const res = await fetch(`/api/onboarding-documents-response/${responseId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        toast.error(body?.error ?? "Failed to update document status.")
+        return
+      }
+
+      toast.success(`Document response status updated to ${status}`)
+      await loadDetail()
+    } catch {
+      toast.error("An error occurred while updating document status.")
+    } finally {
+      setUpdatingResponseId(null)
+    }
+  }
 
   async function loadDetail(showLoader = false) {
     if (showLoader) {
@@ -98,6 +180,9 @@ export default function ClientOnboardingDetailPage({
       if (!selectedForm && data.assigned_forms.length > 0) {
         setSelectedForm(data.assigned_forms[0])
       }
+      if (!selectedDocument && data.assigned_documents.length > 0) {
+        setSelectedDocument(data.assigned_documents[0])
+      }
     } catch (error) {
       setError(
         error instanceof Error
@@ -117,10 +202,18 @@ export default function ClientOnboardingDetailPage({
   const selectedFormResponses = useMemo(() => {
     if (!detail || !selectedForm) return []
 
-    return detail.form_responses.filter(
-      (response) => response.form_assigned_id === selectedForm.id
-    )
+    return detail.form_responses
+      .filter((response) => response.form_assigned_id === selectedForm.id)
+      .sort((a, b) => b.version_number - a.version_number)
   }, [detail, selectedForm])
+
+  const selectedDocumentResponses = useMemo(() => {
+    if (!detail || !selectedDocument) return []
+
+    return detail.document_responses
+      .filter((response) => response.document_assigned_id === selectedDocument.id)
+      .sort((a, b) => b.version_number - a.version_number)
+  }, [detail, selectedDocument])
 
   const activityItems = useMemo(() => {
     if (!detail) return []
@@ -151,6 +244,38 @@ export default function ClientOnboardingDetailPage({
     })
   }, [detail])
 
+  const formsTotal = detail?.assigned_forms.length ?? 0
+  const formsFilled = useMemo(() => {
+    if (!detail) return 0
+    return detail.assigned_forms.filter(
+      (f) => f.status === "Approved"
+    ).length
+  }, [detail])
+
+  const documentsTotal = detail?.assigned_documents.length ?? 0
+  const documentsFilled = useMemo(() => {
+    if (!detail) return 0
+    return detail.assigned_documents.filter(
+      (d) => d.status === "Approved"
+    ).length
+  }, [detail])
+
+  const locationString = useMemo(() => {
+    if (!detail?.client) return "-"
+    const parts = [
+      detail.client.city,
+      detail.client.state,
+      detail.client.country,
+    ].filter(Boolean)
+    if (parts.length > 0) return parts.join(", ")
+    return (
+      detail.client.address_line_1 ||
+      detail.client.location ||
+      detail.branch?.city ||
+      "-"
+    )
+  }, [detail])
+
   if (loading) {
     return (
       <div className="content">
@@ -173,6 +298,7 @@ export default function ClientOnboardingDetailPage({
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: "overview", label: "Overview" },
     { key: "forms", label: "Forms" },
+    { key: "documents", label: "Documents" },
     { key: "activity", label: "Activity" },
     { key: "tickets", label: "Tickets" },
   ]
@@ -237,10 +363,10 @@ export default function ClientOnboardingDetailPage({
               </div>
             </div>
             <div className="info-row">
-              <div className="info-row-label">Finish Date</div>
+              <div className="info-row-label">Due Date</div>
               <div className="info-row-val">
-                {onboarding.finish_date
-                  ? new Date(onboarding.finish_date).toLocaleDateString()
+                {onboarding.due_date
+                  ? new Date(onboarding.due_date).toLocaleDateString()
                   : "-"}
               </div>
             </div>
@@ -251,14 +377,11 @@ export default function ClientOnboardingDetailPage({
           </div>
           <div className="stat-card">
             <div className="section-heading">Forms</div>
-            <ProgressCell filled={onboarding.forms_filled} total={onboarding.forms_total} />
+            <ProgressCell filled={formsFilled} total={formsTotal} />
           </div>
           <div className="stat-card">
             <div className="section-heading">Documents</div>
-            <ProgressCell
-              filled={onboarding.documents_filled}
-              total={onboarding.documents_total}
-            />
+            <ProgressCell filled={documentsFilled} total={documentsTotal} />
           </div>
         </div>
 
@@ -293,6 +416,10 @@ export default function ClientOnboardingDetailPage({
                 <OnboardingDocumentsTable
                   documents={detail.assigned_documents}
                   responses={detail.document_responses}
+                  onSelect={(doc) => {
+                    setSelectedDocument(doc)
+                    setActiveTab("documents")
+                  }}
                 />
               </div>
               <div className="stat-card">
@@ -303,7 +430,7 @@ export default function ClientOnboardingDetailPage({
           ) : null}
 
           {activeTab === "forms" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 320px", gap: "16px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="stat-card">
                 <div className="section-heading">Assigned Forms</div>
                 <OnboardingFormsTable
@@ -314,8 +441,11 @@ export default function ClientOnboardingDetailPage({
                     setSelectedResponse(null)
                   }}
                 />
-                <div className="section-heading" style={{ marginTop: "16px" }}>
-                  Responses
+              </div>
+
+              <div className="stat-card">
+                <div className="section-heading">
+                  Responses {selectedForm ? `(${selectedForm.form?.form_name ?? selectedForm.form_id})` : ""}
                 </div>
                 <div className="table-wrap">
                   <table>
@@ -324,28 +454,54 @@ export default function ClientOnboardingDetailPage({
                         <th>Version</th>
                         <th>Status</th>
                         <th>Submitted</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedFormResponses.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="empty">No responses yet</td>
+                          <td colSpan={4} className="empty">
+                            No responses submitted yet
+                          </td>
                         </tr>
                       ) : (
                         selectedFormResponses.map((response) => (
                           <tr
                             key={response.id}
-                            className="cursor-pointer"
+                            className={selectedResponse?.id === response.id ? "selected-row cursor-pointer" : "cursor-pointer"}
                             onClick={() => setSelectedResponse(response)}
                           >
-                            <td>{response.version_number}</td>
+                            <td>Version {response.version_number}</td>
                             <td>
                               <OnboardingStatusBadge status={response.status} />
                             </td>
                             <td className="quote-id">
                               {response.submitted_date
-                                ? new Date(response.submitted_date).toLocaleDateString()
+                                ? new Date(response.submitted_date).toLocaleString()
                                 : "-"}
+                            </td>
+                            <td onClick={(e) => e.stopPropagation()}>
+                              <div style={{ display: "flex", gap: "6px" }}>
+                                <Button
+                                  size="sm"
+                                  className="btn btn-primary"
+                                  disabled={updatingResponseId === response.id}
+                                  onClick={() => void updateResponseStatus(response.id, "Approved")}
+                                  style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="btn btn-ghost"
+                                  disabled={updatingResponseId === response.id}
+                                  onClick={() => void updateResponseStatus(response.id, "Rejected")}
+                                  style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
+                                >
+                                  Reject
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -354,10 +510,115 @@ export default function ClientOnboardingDetailPage({
                   </table>
                 </div>
               </div>
+
               <ResponseReviewPanel
                 response={selectedResponse}
                 onReviewed={() => void loadDetail()}
               />
+            </div>
+          ) : null}
+
+          {activeTab === "documents" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="stat-card">
+                <div className="section-heading">Assigned Documents</div>
+                <OnboardingDocumentsTable
+                  documents={detail.assigned_documents}
+                  responses={detail.document_responses}
+                  onSelect={(doc) => {
+                    setSelectedDocument(doc)
+                  }}
+                />
+              </div>
+
+              <div className="stat-card">
+                <div className="section-heading">
+                  Document Submissions {selectedDocument ? `(${selectedDocument.document?.name ?? selectedDocument.document_id})` : ""}
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Submitted</th>
+                        <th>Document</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedDocumentResponses.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="empty">
+                            No document submissions yet
+                          </td>
+                        </tr>
+                      ) : (
+                        selectedDocumentResponses.map((response) => (
+                          <tr key={response.id}>
+                            <td>Version {response.version_number}</td>
+                            <td>
+                              <OnboardingStatusBadge status={response.status} />
+                            </td>
+                            <td className="quote-id">
+                              {response.submitted_date
+                                ? new Date(response.submitted_date).toLocaleString()
+                                : response.created_at
+                                ? new Date(response.created_at).toLocaleString()
+                                : "-"}
+                            </td>
+                            <td>
+                              {response.document_link ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="btn btn-ghost"
+                                  onClick={() => window.open(response.document_link!, "_blank", "noopener,noreferrer")}
+                                  style={{
+                                    height: "26px",
+                                    fontSize: "11px",
+                                    padding: "0 8px",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                  }}
+                                >
+                                  <FileText size={12} color="var(--accent)" /> View File
+                                </Button>
+                              ) : (
+                                "-"
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: "flex", gap: "6px" }}>
+                                <Button
+                                  size="sm"
+                                  className="btn btn-primary"
+                                  disabled={updatingResponseId === response.id}
+                                  onClick={() => void updateDocumentResponseStatus(response.id, "Approved")}
+                                  style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="btn btn-ghost"
+                                  disabled={updatingResponseId === response.id}
+                                  onClick={() => void updateDocumentResponseStatus(response.id, "Rejected")}
+                                  style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
+                                >
+                                  Reject
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -376,20 +637,31 @@ export default function ClientOnboardingDetailPage({
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           <div className="stat-card">
             <div className="section-heading">Client Bio</div>
-            <div className="client-name">{client?.company_name ?? "-"}</div>
+            <div className="client-name">{client?.company_name ?? onboarding.client_id}</div>
             <div className="client-org">{client?.industry ?? "No industry"}</div>
-            <div className="info-row">
-              <div className="info-row-label">Email</div>
-              <div className="info-row-val">{client?.email ?? "-"}</div>
+            <div className="info-row" style={{ marginTop: "10px" }}>
+              <div className="info-row-label">Branch Name</div>
+              <div className="info-row-val">{detail.branch?.branch_name ?? client?.branch_name ?? "Main Branch"}</div>
             </div>
             <div className="info-row">
-              <div className="info-row-label">Phone</div>
-              <div className="info-row-val">{client?.phone ?? "-"}</div>
+              <div className="info-row-label">Location</div>
+              <div className="info-row-val">{locationString}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="section-heading">Contact Highlight</div>
-            <div className="empty-text">Use Contacts module for contact details.</div>
+            <div className="info-row">
+              <div className="info-row-label">Name</div>
+              <div className="info-row-val">{detail.contact?.name ?? client?.company_name ?? "-"}</div>
+            </div>
+            <div className="info-row">
+              <div className="info-row-label">Email</div>
+              <div className="info-row-val">{detail.contact?.email ?? client?.email ?? "-"}</div>
+            </div>
+            <div className="info-row">
+              <div className="info-row-label">Phone No.</div>
+              <div className="info-row-val">{detail.contact?.phone ?? detail.contact?.mobile ?? client?.phone ?? "-"}</div>
+            </div>
           </div>
           <div className="stat-card">
             <div className="section-heading">Tasks Highlight</div>

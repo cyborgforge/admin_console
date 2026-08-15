@@ -4,7 +4,7 @@ create table if not exists public.onboarding_clients (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null,
   start_date timestamptz default current_timestamp,
-  finish_date timestamptz,
+  due_date timestamptz,
   status varchar(50) not null default 'Pending' check (status in ('Pending', 'In Progress', 'Under Review', 'Approved', 'Rejected', 'Skipped')),
   forms_filled integer not null default 0 check (forms_filled >= 0),
   forms_total integer not null default 0 check (forms_total >= 0),

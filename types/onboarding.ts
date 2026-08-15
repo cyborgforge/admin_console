@@ -10,7 +10,7 @@ export type OnboardingClient = {
   id: string
   client_id: string
   start_date: string | null
-  finish_date: string | null
+  due_date: string | null
   status: OnboardingStatus
   forms_filled: number
   forms_total: number
@@ -110,12 +110,31 @@ export type OnboardingClientListItem =
       phone: string | null
       industry: string | null
       status: string | null
+      city?: string | null
+      state?: string | null
+      country?: string | null
+      address_line_1?: string | null
+      location?: string | null
+      branch_name?: string | null
     } | null
   }
 
 export type OnboardingClientDetail = {
   onboarding_client: OnboardingClient
   client: OnboardingClientListItem["client"]
+  branch?: {
+    id: string
+    branch_name: string
+    city?: string | null
+    state?: string | null
+  } | null
+  contact?: {
+    id: string
+    name: string
+    email: string | null
+    phone: string | null
+    mobile?: string | null
+  } | null
   assigned_forms: OnboardingFormAssigned[]
   assigned_documents: OnboardingDocumentAssigned[]
   form_responses: OnboardingFormResponse[]
