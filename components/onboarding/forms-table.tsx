@@ -20,7 +20,6 @@ export function OnboardingFormsTable({
         <thead>
           <tr>
             <th>Form</th>
-            <th>Version</th>
             <th>Status</th>
             <th>Due</th>
             <th>Responses</th>
@@ -29,19 +28,27 @@ export function OnboardingFormsTable({
         <tbody>
           {forms.length === 0 ? (
             <tr>
-              <td colSpan={5} className="empty">
+              <td colSpan={4} className="empty">
                 No forms assigned
               </td>
             </tr>
           ) : (
             forms.map((form) => {
-              const formResponses = responses
-                .filter((item) => item.form_assigned_id === form.id)
-                .sort((a, b) => b.version_number - a.version_number)
-
-              const latest = formResponses[0]
-              const displayStatus = latest?.status ?? form.status ?? "Pending"
-              const versionText = latest ? `v${latest.version_number}` : "-"
+              const formResponses = responses.filter(
+                (item) => item.form_assigned_id === form.id
+              )
+              const latestResponse = formResponses[0]
+              const isApproved =
+                form.status === "Approved" ||
+                (form.status as string) === "Accepted" ||
+                formResponses.some(
+                  (r) =>
+                    r.status === "Approved" ||
+                    (r.status as string) === "Accepted"
+                )
+              const displayStatus = isApproved
+                ? "Approved"
+                : latestResponse?.status ?? form.status ?? "Pending"
 
               return (
                 <tr
@@ -49,27 +56,7 @@ export function OnboardingFormsTable({
                   onClick={() => onSelect?.(form)}
                   className={onSelect ? "cursor-pointer" : undefined}
                 >
-                  <td>
-                    <div style={{ fontWeight: 500 }}>
-                      {form.form?.form_name ?? form.form_id}
-                    </div>
-                  </td>
-                  <td>
-                    <span
-                      style={{
-                        display: "inline-block",
-                        padding: "2px 8px",
-                        borderRadius: "12px",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        background: "var(--surface2)",
-                        color: "var(--accent)",
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      {versionText}
-                    </span>
-                  </td>
+                  <td>{form.form?.form_name ?? form.form_id}</td>
                   <td>
                     <OnboardingStatusBadge status={displayStatus} />
                   </td>
@@ -88,4 +75,3 @@ export function OnboardingFormsTable({
     </div>
   )
 }
-

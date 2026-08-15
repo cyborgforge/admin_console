@@ -1,5 +1,5 @@
 import { FileText, ExternalLink } from "lucide-react"
-import { Button } from "@/components/ui/button"
+
 import type {
   OnboardingDocumentAssigned,
   OnboardingDocumentResponse,
@@ -10,115 +10,87 @@ import { OnboardingStatusBadge } from "./status-badge"
 export function OnboardingDocumentsTable({
   documents,
   responses,
-  onSelect,
 }: {
   documents: OnboardingDocumentAssigned[]
   responses: OnboardingDocumentResponse[]
-  onSelect?: (document: OnboardingDocumentAssigned) => void
 }) {
-  const handleOpenDocument = (
-    e: React.MouseEvent,
-    link: string | null | undefined
-  ) => {
-    e.stopPropagation()
-    if (link) {
-      window.open(link, "_blank", "noopener,noreferrer")
-    }
-  }
-
   return (
     <div className="table-wrap">
       <table>
         <thead>
           <tr>
             <th>Document</th>
-            <th>Version</th>
             <th>Status</th>
             <th>Due</th>
-            <th>Document File</th>
+            <th>Latest Submission</th>
           </tr>
         </thead>
         <tbody>
           {documents.length === 0 ? (
             <tr>
-              <td colSpan={5} className="empty">
+              <td colSpan={4} className="empty">
                 No documents assigned
               </td>
             </tr>
           ) : (
             documents.map((document) => {
-              const docResponses = responses
-                .filter((item) => item.document_assigned_id === document.id)
-                .sort((a, b) => b.version_number - a.version_number)
-
+              const docResponses = responses.filter(
+                (item) => item.document_assigned_id === document.id
+              )
               const latest = docResponses[0]
-              const displayStatus = latest?.status ?? document.status ?? "Pending"
-              const versionText = latest ? `v${latest.version_number}` : "-"
-              const documentLink = latest?.document_link
+              const isApproved =
+                document.status === "Approved" ||
+                (document.status as string) === "Accepted" ||
+                docResponses.some(
+                  (r) =>
+                    r.status === "Approved" ||
+                    (r.status as string) === "Accepted"
+                )
+              const displayStatus = isApproved
+                ? "Approved"
+                : latest?.status ?? document.status ?? "Pending"
 
               return (
-                <tr
-                  key={document.id}
-                  onClick={() => onSelect?.(document)}
-                  className={onSelect ? "cursor-pointer" : undefined}
-                >
+                <tr key={document.id}>
                   <td>
-                    <div style={{ fontWeight: 500 }}>
-                      {document.document?.name ?? document.document_id}
-                    </div>
+                    {document.document?.name ??
+                      document.document_id}
                   </td>
                   <td>
-                    <span
-                      style={{
-                        display: "inline-block",
-                        padding: "2px 8px",
-                        borderRadius: "12px",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        background: "var(--surface2)",
-                        color: "var(--accent)",
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      {versionText}
-                    </span>
-                  </td>
-                  <td>
-                    <OnboardingStatusBadge status={displayStatus} />
+                    <OnboardingStatusBadge
+                      status={displayStatus}
+                    />
                   </td>
                   <td className="quote-id">
                     {document.due_date
-                      ? new Date(document.due_date).toLocaleDateString()
+                      ? new Date(
+                          document.due_date
+                        ).toLocaleDateString()
                       : "-"}
                   </td>
                   <td>
-                    {documentLink ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="btn btn-ghost"
-                        onClick={(e) => handleOpenDocument(e, documentLink)}
+                    {latest?.document_link ? (
+                      <a
+                        href={latest.document_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "6px",
-                          height: "28px",
-                          fontSize: "12px",
-                          padding: "0 10px",
+                          color: "var(--accent)",
+                          textDecoration: "none",
+                          fontSize: "13px",
+                          fontWeight: 500,
                         }}
+                        title="Open document"
                       >
-                        <FileText size={14} color="var(--accent)" />
+                        <FileText size={15} />
                         <span>View Document</span>
-                        <ExternalLink size={12} style={{ opacity: 0.6 }} />
-                      </Button>
-                    ) : latest ? (
-                      <span style={{ fontSize: "12px", color: "var(--text3)", fontStyle: "italic" }}>
-                        Submitted (No file link)
-                      </span>
+                        <ExternalLink size={12} style={{ opacity: 0.7 }} />
+                      </a>
                     ) : (
-                      <span style={{ fontSize: "12px", color: "var(--text3)" }}>
-                        -
-                      </span>
+                      "-"
                     )}
                   </td>
                 </tr>
@@ -130,4 +102,3 @@ export function OnboardingDocumentsTable({
     </div>
   )
 }
-

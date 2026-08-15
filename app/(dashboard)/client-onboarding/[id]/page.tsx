@@ -3,13 +3,11 @@
 import { use, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 
-import { FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { getSupabaseClient } from "@/lib/supabaseClient"
 import type {
   OnboardingClientDetail,
-  OnboardingDocumentAssigned,
   OnboardingFormAssigned,
   OnboardingFormResponse,
 } from "@/types/onboarding"
@@ -24,7 +22,7 @@ type PageProps = {
   params: Promise<{ id: string }>
 }
 
-type Tab = "overview" | "forms" | "documents" | "activity" | "tickets"
+type Tab = "overview" | "forms" | "activity" | "tickets"
 
 const tabContainerStyle: React.CSSProperties = {
   display: "flex",
@@ -58,8 +56,6 @@ export default function ClientOnboardingDetailPage({
   const [activeTab, setActiveTab] = useState<Tab>("overview")
   const [selectedForm, setSelectedForm] =
     useState<OnboardingFormAssigned | null>(null)
-  const [selectedDocument, setSelectedDocument] =
-    useState<OnboardingDocumentAssigned | null>(null)
   const [selectedResponse, setSelectedResponse] =
     useState<OnboardingFormResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -104,44 +100,6 @@ export default function ClientOnboardingDetailPage({
     }
   }
 
-  async function updateDocumentResponseStatus(responseId: string, status: "Approved" | "Rejected") {
-    setUpdatingResponseId(responseId)
-    try {
-      const supabase = getSupabaseClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      const token = session?.access_token
-      if (!token) {
-        toast.error("Please sign in before updating status.")
-        return
-      }
-
-      const res = await fetch(`/api/onboarding-documents-response/${responseId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status }),
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        toast.error(body?.error ?? "Failed to update document status.")
-        return
-      }
-
-      toast.success(`Document response status updated to ${status}`)
-      await loadDetail()
-    } catch {
-      toast.error("An error occurred while updating document status.")
-    } finally {
-      setUpdatingResponseId(null)
-    }
-  }
-
   async function loadDetail(showLoader = false) {
     if (showLoader) {
       setLoading(true)
@@ -180,9 +138,6 @@ export default function ClientOnboardingDetailPage({
       if (!selectedForm && data.assigned_forms.length > 0) {
         setSelectedForm(data.assigned_forms[0])
       }
-      if (!selectedDocument && data.assigned_documents.length > 0) {
-        setSelectedDocument(data.assigned_documents[0])
-      }
     } catch (error) {
       setError(
         error instanceof Error
@@ -202,18 +157,10 @@ export default function ClientOnboardingDetailPage({
   const selectedFormResponses = useMemo(() => {
     if (!detail || !selectedForm) return []
 
-    return detail.form_responses
-      .filter((response) => response.form_assigned_id === selectedForm.id)
-      .sort((a, b) => b.version_number - a.version_number)
+    return detail.form_responses.filter(
+      (response) => response.form_assigned_id === selectedForm.id
+    )
   }, [detail, selectedForm])
-
-  const selectedDocumentResponses = useMemo(() => {
-    if (!detail || !selectedDocument) return []
-
-    return detail.document_responses
-      .filter((response) => response.document_assigned_id === selectedDocument.id)
-      .sort((a, b) => b.version_number - a.version_number)
-  }, [detail, selectedDocument])
 
   const activityItems = useMemo(() => {
     if (!detail) return []
@@ -298,7 +245,6 @@ export default function ClientOnboardingDetailPage({
   const tabs: Array<{ key: Tab; label: string }> = [
     { key: "overview", label: "Overview" },
     { key: "forms", label: "Forms" },
-    { key: "documents", label: "Documents" },
     { key: "activity", label: "Activity" },
     { key: "tickets", label: "Tickets" },
   ]
@@ -416,10 +362,6 @@ export default function ClientOnboardingDetailPage({
                 <OnboardingDocumentsTable
                   documents={detail.assigned_documents}
                   responses={detail.document_responses}
-                  onSelect={(doc) => {
-                    setSelectedDocument(doc)
-                    setActiveTab("documents")
-                  }}
                 />
               </div>
               <div className="stat-card">
@@ -515,110 +457,6 @@ export default function ClientOnboardingDetailPage({
                 response={selectedResponse}
                 onReviewed={() => void loadDetail()}
               />
-            </div>
-          ) : null}
-
-          {activeTab === "documents" ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div className="stat-card">
-                <div className="section-heading">Assigned Documents</div>
-                <OnboardingDocumentsTable
-                  documents={detail.assigned_documents}
-                  responses={detail.document_responses}
-                  onSelect={(doc) => {
-                    setSelectedDocument(doc)
-                  }}
-                />
-              </div>
-
-              <div className="stat-card">
-                <div className="section-heading">
-                  Document Submissions {selectedDocument ? `(${selectedDocument.document?.name ?? selectedDocument.document_id})` : ""}
-                </div>
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Version</th>
-                        <th>Status</th>
-                        <th>Submitted</th>
-                        <th>Document</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedDocumentResponses.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="empty">
-                            No document submissions yet
-                          </td>
-                        </tr>
-                      ) : (
-                        selectedDocumentResponses.map((response) => (
-                          <tr key={response.id}>
-                            <td>Version {response.version_number}</td>
-                            <td>
-                              <OnboardingStatusBadge status={response.status} />
-                            </td>
-                            <td className="quote-id">
-                              {response.submitted_date
-                                ? new Date(response.submitted_date).toLocaleString()
-                                : response.created_at
-                                ? new Date(response.created_at).toLocaleString()
-                                : "-"}
-                            </td>
-                            <td>
-                              {response.document_link ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="btn btn-ghost"
-                                  onClick={() => window.open(response.document_link!, "_blank", "noopener,noreferrer")}
-                                  style={{
-                                    height: "26px",
-                                    fontSize: "11px",
-                                    padding: "0 8px",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                  }}
-                                >
-                                  <FileText size={12} color="var(--accent)" /> View File
-                                </Button>
-                              ) : (
-                                "-"
-                              )}
-                            </td>
-                            <td>
-                              <div style={{ display: "flex", gap: "6px" }}>
-                                <Button
-                                  size="sm"
-                                  className="btn btn-primary"
-                                  disabled={updatingResponseId === response.id}
-                                  onClick={() => void updateDocumentResponseStatus(response.id, "Approved")}
-                                  style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
-                                >
-                                  Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="btn btn-ghost"
-                                  disabled={updatingResponseId === response.id}
-                                  onClick={() => void updateDocumentResponseStatus(response.id, "Rejected")}
-                                  style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
-                                >
-                                  Reject
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
           ) : null}
 
