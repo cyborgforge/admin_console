@@ -13,9 +13,14 @@ import DealDetailsTab from "@/components/deals/dealDetailsTab"
 
 import type { DealProductModule } from "@/types/deal-products/module"
 import type { DealProductService } from "@/types/deal-products/service"
+import ActivitiesTab from "@/components/activities/ActivitiesTab"
+import { Activity } from "@/types/activity"
+
+
 
 type ClientTab =
   | "details"
+  | "activities"
   | "quotes"
   | "contracts"
   | "cases"
@@ -53,96 +58,109 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 export default function DealsDetailsPage({ params }: PageProps) {
-    const [client, setClient] = useState<Client | null>(null)
-    const [contacts, setContacts] = useState<Contact[] | null>([])
-    const [deals, setDeals] = useState<Deal | null>(null)
-    const [modules, setModules] = useState<DealProductModule[] | []>([])
-    const [services, setServices] = useState<DealProductService[] | []>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
-    
-//     useEffect(() => {
-//   console.log("Deals changed:", deals)
-// }, [deals])
+  const [client, setClient] = useState<Client | null>(null)
+  const [contacts, setContacts] = useState<Contact[] | null>([])
+  const [deals, setDeals] = useState<Deal | null>(null)
+  const [modules, setModules] = useState<DealProductModule[] | []>([])
+  const [services, setServices] = useState<DealProductService[] | []>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activities, setActivities] = useState<Activity[]>([]);
 
-    //loader function to fetch deal details by ID and set state
-    const loadClient = async (
-  clientId: string,
-  showLoader = false
-) => {
-  if (showLoader) {
-    setLoading(true)
-  }
+  //     useEffect(() => {
+  //   console.log("Deals changed:", deals)
+  // }, [deals])
 
-  try {
-    setError(null)
-
-    const supabase = getSupabaseClient()
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    const token = session?.access_token
-
-    if (!token) {
-      throw new Error(
-        "Please sign in to load client."
-      )
+  //loader function to fetch deal details by ID and set state
+  const loadClient = async (
+    clientId: string,
+    showLoader = false
+  ) => {
+    if (showLoader) {
+      setLoading(true)
     }
 
-    const response = await fetch(
-      `/api/deals/${clientId}`,
-      {
-        cache: "no-store",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
+    try {
+      setError(null)
 
-    if (!response.ok) {
-      const responseData =
-        (await response.json()) as {
-          error?: string
+      const supabase = getSupabaseClient()
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const token = session?.access_token
+
+      if (!token) {
+        throw new Error(
+          "Please sign in to load client."
+        )
+      }
+
+      const response = await fetch(
+        `/api/deals/${clientId}`,
+        {
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-
-      throw new Error(
-        responseData.error ??
-          "Failed to load client."
       )
-    }
 
-    const data =
-      (await response.json()) as {
-        client: Client
-        contacts: Contact[]
-        deal: Deal
-        productModules: DealProductModule[]
-        productServices: DealProductService[]
+      if (!response.ok) {
+        const responseData =
+          (await response.json()) as {
+            error?: string
+          }
+
+        throw new Error(
+          responseData.error ??
+          "Failed to load client."
+        )
       }
-    console.log("Fetched deal data:", data)
-    setClient(data.client)
-    setContacts(data.contacts)
-    setDeals(data.deal)
-    setModules(data.productModules)
-    setServices(data.productServices)
-    console.log("deals state:", deals)
-  } catch (error) {
-    setError(
-      error instanceof Error
-        ? error.message
-        : "Failed to load deal."
-    )
-  } finally {
-    setLoading(false)
-  }
-}
 
-// fetching current client using url client id
-// const params = useParams<{
-//   id: string
-// }>()
+      const data =
+        (await response.json()) as {
+          client: Client
+          contacts: Contact[]
+          deal: Deal
+          productModules: DealProductModule[]
+          productServices: DealProductService[]
+        }
+      console.log("Fetched deal data:", data)
+      setClient(data.client)
+      setContacts(data.contacts)
+      setDeals(data.deal)
+      const activityResponse = await fetch(
+        `/api/activities?module=deal&id=${clientId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const activityData = await activityResponse.json();
+
+      setActivities(activityData.activities);
+      setModules(data.productModules)
+      setServices(data.productServices)
+      console.log("deals state:", deals)
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load deal."
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // fetching current client using url client id
+  // const params = useParams<{
+  //   id: string
+  // }>()
 
 
 
@@ -150,13 +168,13 @@ export default function DealsDetailsPage({ params }: PageProps) {
   const id = unwrappedParams.id
   //const router = useRouter()
 
-useEffect(() => {
-  if (!id) return
+  useEffect(() => {
+    if (!id) return
 
-  loadClient(id, true)
-}, [id])
+    loadClient(id, true)
+  }, [id])
 
-//---------
+  //---------
 
   const [activeTab, setActiveTab] =
     useState<ClientTab>("details")
@@ -165,6 +183,10 @@ useEffect(() => {
     {
       key: "details",
       label: "Details",
+    },
+    {
+      key: "activities",
+      label: "Activities",
     },
     {
       key: "quotes",
@@ -270,7 +292,7 @@ useEffect(() => {
                 Industry
               </div>
               <div className="info-row-val">
-                 {client?.industry ?? "—"}
+                {client?.industry ?? "—"}
               </div>
             </div>
 
@@ -288,7 +310,7 @@ useEffect(() => {
                 Managed By
               </div>
               <div className="info-row-val">
-               {client?.created_by ?? "—"}
+                {client?.created_by ?? "—"}
               </div>
             </div>
           </div>
@@ -309,9 +331,9 @@ useEffect(() => {
                 style={getTabStyle(
                   activeTab === tab.key
                 )}
-                onClick={() =>{
-                    console.log("Deals State:", deals)
-                    setActiveTab(
+                onClick={() => {
+                  console.log("Deals State:", deals)
+                  setActiveTab(
                     tab.key as ClientTab
                   )
                 }
@@ -321,39 +343,45 @@ useEffect(() => {
               </button>
             ))}
           </div>
-            
+
           <div className="client-workspace-content">
-           
+
 
             {
-                
-                
-                
-            activeTab ===
-              "details" && 
-                deals  && (
-                <DealDetailsTab deal={deals} modules={modules} services={services} /> )
-              
-            // <h1>Details Tab</h1>
-            // )
-           
-            //    <DealDetailsTab deal={deals} modules={modules} services={services} />
+
+
+
+              activeTab ===
+              "details" &&
+              deals && (
+                <DealDetailsTab deal={deals} modules={modules} services={services} />)
+
+              // <h1>Details Tab</h1>
+              // )
+
+              //    <DealDetailsTab deal={deals} modules={modules} services={services} />
             }
+            {/* Activities Tab */}
+            {activeTab === "activities" && (
+              <ActivitiesTab
+                activities={activities}
+              />
+            )}
 
             {activeTab ===
               "quotes" && (
-              <h1>Quotes Tab</h1>
-            )}
+                <h1>Quotes Tab</h1>
+              )}
 
             {activeTab ===
               "contracts" && (
-              <ClientSubscriptionsTab />
-            )}
+                <ClientSubscriptionsTab />
+              )}
 
             {activeTab ===
               "cases" && (
-              <ClientCasesTab />
-            )}
+                <ClientCasesTab />
+              )}
           </div>
         </div>
 
@@ -365,61 +393,61 @@ useEffect(() => {
             gap: "12px",
           }}
         >
-            {/* Contacts Highlight Card*/}
-         <div className="stat-card">
-  <div className="section-heading">
-    Contacts ({contacts?.length})
-  </div>
+          {/* Contacts Highlight Card*/}
+          <div className="stat-card">
+            <div className="section-heading">
+              Contacts ({contacts?.length})
+            </div>
 
-  <div
-    style={{
-      display: "flex",
-      flexDirection: "column",
-      gap: "10px",
-      marginTop: "12px",
-    }}
-  >
-    {contacts?.length === 0 ? (
-      <div
-        style={{
-          color: "var(--text3)",
-          fontSize: "13px",
-        }}
-      >
-        No contacts found
-      </div>
-    ) : (
-      contacts?.map((contact) => (
-        <div
-          key={contact.id}
-          style={{
-            padding: "12px",
-            border: "1px solid var(--border)",
-            borderRadius: "10px",
-            background: "var(--surface)",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "14px",
-              fontWeight: 600,
-              color: "var(--text)",
-            }}
-          >
-            {contact.name}
-          </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                marginTop: "12px",
+              }}
+            >
+              {contacts?.length === 0 ? (
+                <div
+                  style={{
+                    color: "var(--text3)",
+                    fontSize: "13px",
+                  }}
+                >
+                  No contacts found
+                </div>
+              ) : (
+                contacts?.map((contact) => (
+                  <div
+                    key={contact.id}
+                    style={{
+                      padding: "12px",
+                      border: "1px solid var(--border)",
+                      borderRadius: "10px",
+                      background: "var(--surface)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "var(--text)",
+                      }}
+                    >
+                      {contact.name}
+                    </div>
 
-          <div
-            style={{
-              fontSize: "12px",
-              color: "var(--text2)",
-              marginTop: "2px",
-            }}
-          >
-            {contact.designation ?? "No designation"}
-          </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--text2)",
+                        marginTop: "2px",
+                      }}
+                    >
+                      {contact.designation ?? "No designation"}
+                    </div>
 
-          {/* {(contact.email || contact.mobile) && (
+                    {/* {(contact.email || contact.mobile) && (
             <div
               style={{
                 marginTop: "8px",
@@ -439,42 +467,42 @@ useEffect(() => {
               )}
             </div>
           )} */}
-        </div>
-      ))
-    )}
-  </div>
-</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
           <div className="stat-card">
             <div className="section-heading">
               Notes
             </div>
             <div>
-                {deals?.notes || "No notes recorded."}
+              {deals?.notes || "No notes recorded."}
             </div>
           </div>
 
-          <div className="stat-card">
+          {/* <div className="stat-card">
             <div className="section-heading">
               Activities
             </div>
-             <div style={{
+            <div style={{
               color: "var(--text3)",
               fontSize: "13px",
             }}>
-                {"No activities recorded."}
+              {"No activities recorded."}
             </div>
-          </div>
+          </div> */}
 
           <div className="stat-card">
             <div className="section-heading">
               Tasks
             </div>
-           <div style={{
+            <div style={{
               color: "var(--text3)",
               fontSize: "13px",
             }}>
-                {"No tasks recorded."}
+              {"No tasks recorded."}
             </div>
           </div>
         </div>

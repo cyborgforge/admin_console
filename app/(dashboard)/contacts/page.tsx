@@ -1,1068 +1,1320 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Eye, Search } from "lucide-react"
-import ViewLead from "@/components/leads/ViewLead"
-import EditLead from "@/components/leads/EditLead"
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
+
+import { X } from "lucide-react"
+
 import { getSupabaseClient } from "@/lib/supabaseClient"
-import CreateLeadModal from "@/components/leads/createLeadModal"
-import CreateLeadButton from "@/components/leads/createLeadButton"
-import { Contact } from "@/types/contacts"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+import type {
+  Contact,
+  ContactDraft,
+} from "@/types/contacts"
 
-export type LeadStatus = "discovery" | "contacted" | "reviewing" | "closed-won" | "closed-lost"
+import {
+  DEFAULT_CONTACT_DRAFT,
+} from "@/types/contacts"
 
-export type CreateLeadDraft = {
-  leadName: string
-  company: string
-  email: string
-  phone: string
-  status: LeadStatus
+import ContactsStats from "@/components/contacts/ContactsStats"
+
+import ContactsFilters, {
+  type PeriodFilter,
+} from "@/components/contacts/ContactsFilters"
+
+import ContactsTable from "@/components/contacts/ContactsTable"
+
+import ContactForm, {
+  type ContactBranchOption,
+  type ContactClientOption,
+} from "@/components/contacts/ContactForm"
+
+import ContactDetails from "@/components/contacts/ContactDetails"
+
+import ActionNotification, {
+  type ActionNotificationType,
+} from "@/components/ui/ActionNotification"
+
+/* -------------------------------------------------------------------------- */
+/*                                   TYPES                                    */
+/* -------------------------------------------------------------------------- */
+
+type ContactTab =
+  | "all"
+  | "complete"
+  | "incomplete"
+
+type ContactNotification = {
+  id: number
+  title: string
+  message?: string
+  type: ActionNotificationType
 }
 
-export interface Lead {
-  id: string
-  //name: string
-  leadName: string
-  //org: string
-  company: string
-  email: string
-  phone: string
-  status: LeadStatus
-  //addedOn: string
-  createdDate: string
-  //notes: string
-  color: string
+type ContactsResponse = {
+  contacts?: Contact[]
+  error?: string
 }
 
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const AVATAR_COLORS = ["#4c7ee1", "#8b5cf6", "#ec4899", "#d3a335", "#1ead82", "#06b6d4", "#f97316"]
-
-// const MOCK_LEADS: Lead[] = [
-//   { id: "L-1001", name: "Murali Prakash S", org: "Murali & Co",      email: "murali@gmail.com",   phone: "6734567183", status: "new",       addedOn: "2026-04-10", notes: "", color: "#4c7ee1" },
-//   { id: "L-1002", name: "Anitha Rajan",     org: "Anitha Pharma",    email: "anitha@gmail.com",   phone: "9876543210", status: "contacted", addedOn: "2026-04-11", notes: "Interests: Pharmacy Suite, Clinic Suite", color: "#8b5cf6" },
-//   { id: "L-1003", name: "Vikram Suresh",    org: "Vikram Clinics",   email: "vikram@gmail.com",   phone: "8765432109", status: "reviewed",  addedOn: "2026-04-12", notes: "", color: "#ec4899" },
-//   { id: "L-1004", name: "Priya Nair",       org: "Priya Health",     email: "priya@gmail.com",    phone: "7654321098", status: "found",     addedOn: "2026-04-13", notes: "", color: "#1ead82" },
-//   { id: "L-1005", name: "Senthil Kumar",    org: "SK Medicals",      email: "senthil@gmail.com",  phone: "6543210987", status: "not_found", addedOn: "2026-04-14", notes: "", color: "#d3a335" },
-//   { id: "L-1006", name: "Deepa Menon",      org: "Deepa Healthcare", email: "deepa@gmail.com",    phone: "9988776655", status: "new",       addedOn: "2026-04-15", notes: "", color: "#06b6d4" },
-//   { id: "L-1007", name: "Arun Chandran",    org: "Arun Hospitals",   email: "arun@gmail.com",     phone: "8877665544", status: "converted", addedOn: "2026-04-16", notes: "", color: "#f97316" },
-//   { id: "L-1008", name: "Kavitha Balu",     org: "Kavitha Pharmacy", email: "kavitha@gmail.com",  phone: "7766554433", status: "new",       addedOn: "2026-04-17", notes: "", color: "#4c7ee1" },
-//   { id: "L-1009", name: "Ravi Shankar",     org: "Ravi Surgicals",   email: "ravi@gmail.com",     phone: "6655443322", status: "archived",  addedOn: "2026-04-18", notes: "", color: "#8b5cf6" },
-//   { id: "L-1010", name: "Meena Pillai",     org: "Meena Medicals",   email: "meena@gmail.com",    phone: "9900112233", status: "new",       addedOn: "2026-04-19", notes: "", color: "#1ead82" },
-//   { id: "L-1011", name: "Suresh Babu",      org: "Suresh Clinics",   email: "suresh@gmail.com",   phone: "8811223344", status: "contacted", addedOn: "2026-04-20", notes: "", color: "#d3a335" },
-//   { id: "L-1012", name: "Lakshmi Venkat",   org: "Lakshmi Stores",   email: "lakshmi@gmail.com",  phone: "7722334455", status: "new",       addedOn: "2026-04-21", notes: "", color: "#ec4899" },
-// ]
-
-// ─── Status config ────────────────────────────────────────────────────────────
-
-const statusConfig: Record<LeadStatus, { label: string; bg: string; color: string; dot: string }> = {
-  "discovery":       { label: "New",       bg: "rgba(76,126,225,0.12)",  color: "#4c7ee1", dot: "#4c7ee1" },
-  "contacted": { label: "Contacted", bg: "rgba(211,163,53,0.12)",  color: "#d3a335", dot: "#d3a335" },
-  "reviewing":  { label: "Reviewed",  bg: "rgba(110,107,176,0.12)", color: "#6e6bb0", dot: "#6e6bb0" },
-  "closed-won":     { label: "Found",     bg: "rgba(74,171,176,0.12)",  color: "#4aabb0", dot: "#4aabb0" },
-  "closed-lost": { label: "Not Found", bg: "rgba(196,96,111,0.12)",  color: "#c4606f", dot: "#c4606f" },
-  // converted: { label: "Converted", bg: "rgba(30,173,130,0.12)",  color: "#1ead82", dot: "#1ead82" },
-  // archived:  { label: "Archived",  bg: "rgba(90,96,112,0.12)",   color: "#5a6070", dot: "#5a6070" },
+type ClientsResponse = {
+  clients?: ContactClientOption[]
+  error?: string
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+type BranchesResponse = {
+  branches?: ContactBranchOption[]
+  error?: string
+}
 
-const getInitials = (name: string) =>
-  name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()
+/* -------------------------------------------------------------------------- */
+/*                                  HELPERS                                   */
+/* -------------------------------------------------------------------------- */
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function isContactComplete(
+  contact: Contact
+) {
+  return Boolean(
+    contact.name?.trim() &&
+      contact.designation?.trim() &&
+      contact.email?.trim() &&
+      (
+        contact.mobile?.trim() ||
+        contact.phone?.trim()
+      ) &&
+      contact.client_id &&
+      contact.branch_id
+  )
+}
+
+function isWithinPeriod(
+  createdAt: string,
+  period: PeriodFilter
+) {
+  if (period === "all") {
+    return true
+  }
+
+  const createdDate =
+    new Date(createdAt)
+
+  if (
+    Number.isNaN(
+      createdDate.getTime()
+    )
+  ) {
+    return false
+  }
+
+  const days =
+    period === "30d"
+      ? 30
+      : period === "90d"
+        ? 90
+        : 365
+
+  const cutoff = new Date()
+
+  cutoff.setDate(
+    cutoff.getDate() - days
+  )
+
+  return createdDate >= cutoff
+}
+
+function contactToDraft(
+  contact: Contact
+): ContactDraft {
+  return {
+    name:
+      contact.name ?? "",
+
+    designation:
+      contact.designation ?? "",
+
+    department:
+      contact.department ?? "",
+
+    email:
+      contact.email ?? "",
+
+    mobile:
+      contact.mobile ?? "",
+
+    phone:
+      contact.phone ?? "",
+
+    linkedin:
+      contact.linkedin ?? "",
+
+    client_id:
+      contact.client_id ?? "",
+
+    branch_id:
+      contact.branch_id ?? "",
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              MAIN COMPONENT                                */
+/* -------------------------------------------------------------------------- */
 
 export default function ContactsPage() {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [
+    contacts,
+    setContacts,
+  ] =
+    useState<Contact[]>([])
 
-  const [leads, setLeads] = useState<Contact[]>([])
-  const [query, setQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"all" | LeadStatus>("all")
-  const [period, setPeriod] = useState("all")
-  const [activeTab, setActiveTab] = useState<"all" | "archived" | "existing">("all")
+  const [
+    clients,
+    setClients,
+  ] =
+    useState<
+      ContactClientOption[]
+    >([])
 
-  // View dialog state — null = closed, otherwise the lead being viewed
-  const [viewingLead, setViewingLead] = useState<Contact | null>(null)
-  // Whether the view dialog is in "edit mode"
-  const [isEditing, setIsEditing] = useState(false)
-  // Editable draft inside the view dialog
-  const [editDraft, setEditDraft] = useState<Contact | null>(null)
-  // whether the create lead dialog is open
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [createDraft, setCreateDraft] =
-  useState<CreateLeadDraft>({
-    leadName: "",
-    company: "",
-    email: "",
-    phone: "",
-    status: "discovery",
-  })
+  const [
+    branches,
+    setBranches,
+  ] =
+    useState<
+      ContactBranchOption[]
+    >([])
 
-  
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true)
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
-//   const stats = useMemo(() => ({
-//     total:     leads.length,
-//     newLeads:  leads.filter((l) => l.status === "discovery").length,
-//     contacted: leads.filter((l) => l.status === "contacted" || l.status === "reviewing").length,
-//     converted: leads.filter((l) => l.status === "closed-won").length,
-//   }), [leads])
+  const [
+    saving,
+    setSaving,
+  ] =
+    useState(false)
 
-//   const tabCounts = useMemo(() => ({
-//     all:      leads.length,
-//     archived: leads.filter((l) => l.status === "closed-won" || l.status === "closed-lost").length,
-//     existing: leads.filter((l) => l.status !== "closed-won" && l.status !== "closed-lost").length,
-//   }), [leads])
+  const [
+    error,
+    setError,
+  ] =
+    useState<
+      string | null
+    >(null)
 
-  // // ── Filtered rows ──────────────────────────────────────────────────────────
-  // const filtered = useMemo(() => leads.filter((l) => {
-  //   const q = `${l.id} ${l.leadName} ${l.company} ${l.email} ${l.phone}`.toLowerCase()
-  //   const mQ = q.includes(query.toLowerCase())
-  //   const mS = statusFilter === "all" || l.status === statusFilter
-  //   const mT = activeTab === "archived" ? l.status === "archived"
-  //            : activeTab === "existing"  ? l.status === "converted"
-  //            : l.status !== "archived"
-  //   return mQ && mS && mT
-  // }), [leads, query, statusFilter, activeTab])
+  const [
+    notification,
+    setNotification,
+  ] =
+    useState<
+      ContactNotification | null
+    >(null)
 
-  // --- New Filtered rows
+  const [
+    query,
+    setQuery,
+  ] =
+    useState("")
 
-  const filtered = useMemo(() =>
-  leads.filter((l) => {
-    const q = `${l.id} ${l.name} ${l.designation} ${l.email} ${l.phone}`.toLowerCase()
+  const [
+    clientFilter,
+    setClientFilter,
+  ] =
+    useState("all")
 
-    const mQ = q.includes(query.toLowerCase())
+  const [
+    periodFilter,
+    setPeriodFilter,
+  ] =
+    useState<PeriodFilter>(
+      "all"
+    )
 
-    // const mS =
-    //   statusFilter === "all" ||
-    //   l.status === statusFilter
+  const [
+    activeTab,
+    setActiveTab,
+  ] =
+    useState<ContactTab>(
+      "all"
+    )
 
-    // const mT =
-    //   activeTab === "archived"
-    //     ? l.status === "closed-won" || l.status === "closed-lost"
-    //     : activeTab === "existing"
-    //     ? l.status !== "closed-won" && l.status !== "closed-lost"
-    //     : true
+  const [
+    createOpen,
+    setCreateOpen,
+  ] =
+    useState(false)
 
-    return mQ //&& mS && mT
-  }),
-  [leads, query, statusFilter, activeTab]
-)
-// -----
+  const [
+    createDraft,
+    setCreateDraft,
+  ] =
+    useState<ContactDraft>({
+      ...DEFAULT_CONTACT_DRAFT,
+    })
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
-//   const handleCreate = () => {
-//     if (!nName.trim() || !nEmail.trim()) return
-//     const lead: Lead = {
-//       id: `L-${1000 + leads.length + 1}`,
-//       leadName: nName, company: nOrg, email: nEmail, phone: nPhone, status: nStatus,
-//       createdDate: new Date().toISOString().slice(0, 10),
-//       //notes: "",
-//       color: AVATAR_COLORS[leads.length % AVATAR_COLORS.length],
-//     }
-//     setLeads((p) => [lead, ...p])
-//     setNewOpen(false)
-//     setNName(""); setNOrg(""); setNEmail(""); setNPhone(""); setNStatus("discovery")
-//   }
+  const [
+    selectedContact,
+    setSelectedContact,
+  ] =
+    useState<Contact | null>(
+      null
+    )
 
-  // Open view dialog
-  const openView = (lead: Contact) => {
-    setViewingLead({ ...lead })
-    setIsEditing(false)
-    setEditDraft(null)
+  const [
+    editDraft,
+    setEditDraft,
+  ] =
+    useState<ContactDraft | null>(
+      null
+    )
+
+  /* ------------------------------------------------------------------------ */
+  /*                              NOTIFICATIONS                               */
+  /* ------------------------------------------------------------------------ */
+
+  function showNotification(
+    title: string,
+    message?: string,
+    type: ActionNotificationType =
+      "success"
+  ) {
+    setNotification({
+      id: Date.now(),
+      title,
+      message,
+      type,
+    })
   }
 
-  // Enter edit mode inside view dialog
-  const startEdit = () => {
-    if (!viewingLead) return
-    setEditDraft({ ...viewingLead })
-    setIsEditing(true)
-  }
+  useEffect(() => {
+    if (!notification) {
+      return
+    }
 
-  // Save edits and exit edit mode
+    const timer =
+      window.setTimeout(
+        () => {
+          setNotification(null)
+        },
+        3500
+      )
 
-// const saveEdit = async () => {
-//   if (!editDraft) return
+    return () => {
+      window.clearTimeout(
+        timer
+      )
+    }
+  }, [notification])
 
-//   try {
-//     const supabase = getSupabaseClient()
+  /* ------------------------------------------------------------------------ */
+  /*                                  LOOKUPS                                 */
+  /* ------------------------------------------------------------------------ */
 
-//     const {
-//       data: { session },
-//     } = await supabase.auth.getSession()
+  const clientNameById =
+    useMemo(
+      () =>
+        new Map(
+          clients.map(
+            (client) => [
+              client.id,
+              client.company_name,
+            ]
+          )
+        ),
+      [clients]
+    )
 
-//     const token = session?.access_token
+  const branchNameById =
+    useMemo(
+      () =>
+        new Map(
+          branches.map(
+            (branch) => [
+              branch.id,
+              branch.branch_name,
+            ]
+          )
+        ),
+      [branches]
+    )
 
-//     if (!token) {
-//       throw new Error("Please sign in.")
-//     }
+  /* ------------------------------------------------------------------------ */
+  /*                                   STATS                                  */
+  /* ------------------------------------------------------------------------ */
 
-//     const response = await fetch(
-//       `/api/leads/${editDraft.id}`,
-//       {
-//         method: "PUT",
-//         headers: {
-//           "Content-Type": "application/json",
-//           Authorization: `Bearer ${token}`,
-//         },
-//         body: JSON.stringify({
-//           name: editDraft.leadName,
-//           company: editDraft.company,
-//           email: editDraft.email,
-//           phone: editDraft.phone,
-//           status: editDraft.status,
-//         }),
-//       }
-//     )
+  const stats =
+    useMemo(() => {
+      const reachable =
+        contacts.filter(
+          (contact) =>
+            contact.email ||
+            contact.mobile ||
+            contact.phone
+        ).length
 
-//     if (!response.ok) {
-//       const errorData = await response.json()
+      const complete =
+        contacts.filter(
+          isContactComplete
+        ).length
 
-//       throw new Error(
-//         errorData.error ?? "Failed to update lead."
-//       )
-//     }
+      const clientsCovered =
+        new Set(
+          contacts
+            .map(
+              (contact) =>
+                contact.client_id
+            )
+            .filter(Boolean)
+        ).size
 
-//     const data = await response.json()
+      return {
+        total:
+          contacts.length,
 
-//     const updatedLead = data.lead ?? editDraft
+        reachable,
 
-//     setLeads((current) =>
-//       current.map((lead) =>
-//         lead.id === updatedLead.id
-//           ? updatedLead
-//           : lead
-//       )
-//     )
+        complete,
 
-//     setViewingLead(updatedLead)
-//     setIsEditing(false)
-//     setEditDraft(null)
-//   } catch (error) {
-//     console.error(error)
-//     setError(
-//       error instanceof Error
-//         ? error.message
-//         : "Failed to update lead."
-//     )
-//   }
-// }
+        clientsCovered,
+      }
+    }, [contacts])
 
-// ----- create lead handler
-// const createLead = async () => {
-//   try {
-//     const supabase = getSupabaseClient()
+  const tabCounts =
+    useMemo(
+      () => ({
+        all:
+          contacts.length,
 
-//     const {
-//       data: { session },
-//     } = await supabase.auth.getSession()
+        complete:
+          contacts.filter(
+            isContactComplete
+          ).length,
 
-//     const token = session?.access_token
+        incomplete:
+          contacts.filter(
+            (contact) =>
+              !isContactComplete(
+                contact
+              )
+          ).length,
+      }),
+      [contacts]
+    )
 
-//     if (!token) {
-//       throw new Error("Please sign in.")
-//     }
+  /* ------------------------------------------------------------------------ */
+  /*                                 FILTERING                                */
+  /* ------------------------------------------------------------------------ */
 
-//     const response = await fetch(
-//       "/api/leads",
-//       {
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json",
-//           Authorization: `Bearer ${token}`,
-//         },
-//         body: JSON.stringify({
-//           leadName: createDraft.leadName,
-//           company: createDraft.company,
-//           email: createDraft.email,
-//           phone: createDraft.phone,
-//           status: createDraft.status,
-//         }),
-//       }
-//     )
+  const filteredContacts =
+    useMemo(() => {
+      const normalizedQuery =
+        query
+          .trim()
+          .toLowerCase()
 
-//     if (!response.ok) {
-//       const errorData = await response.json()
+      return contacts.filter(
+        (contact) => {
+          const clientName =
+            contact.clients
+              ?.company_name ??
+            clientNameById.get(
+              contact.client_id
+            ) ??
+            ""
 
-//       throw new Error(
-//         errorData.error ?? "Failed to create lead."
-//       )
-//     }
+          const branchName =
+            branchNameById.get(
+              contact.branch_id
+            ) ?? ""
 
-//     const data = await response.json()
+          const searchable =
+            [
+              contact.id,
+              contact.name,
+              contact.designation,
+              contact.department,
+              contact.email,
+              contact.mobile,
+              contact.phone,
+              clientName,
+              branchName,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
 
-//     const createdLead = data.lead as Lead
+          const matchesSearch =
+            !normalizedQuery ||
+            searchable.includes(
+              normalizedQuery
+            )
 
-//     setLeads((current) => [
-//       createdLead,
-//       ...current,
-//     ])
+          const matchesClient =
+            clientFilter ===
+              "all" ||
+            contact.client_id ===
+              clientFilter
 
-//     setCreateDraft({
-//       leadName: "",
-//       company: "",
-//       email: "",
-//       phone: "",
-//       status: "discovery",
-//     })
+          const matchesPeriod =
+            isWithinPeriod(
+              contact.created_at,
+              periodFilter
+            )
 
-//     setIsCreateOpen(false)
-//   } catch (error) {
-//     console.error(error)
+          const matchesTab =
+            activeTab ===
+              "all" ||
+            (
+              activeTab ===
+              "complete"
+                ? isContactComplete(
+                    contact
+                  )
+                : !isContactComplete(
+                    contact
+                  )
+            )
 
-//     setError(
-//       error instanceof Error
-//         ? error.message
-//         : "Failed to create lead."
-//     )
-//   }
-// }
+          return (
+            matchesSearch &&
+            matchesClient &&
+            matchesPeriod &&
+            matchesTab
+          )
+        }
+      )
+    }, [
+      contacts,
+      query,
+      clientFilter,
+      periodFilter,
+      activeTab,
+      clientNameById,
+      branchNameById,
+    ])
 
-//-------------
+  /* ------------------------------------------------------------------------ */
+  /*                              AUTHENTICATION                              */
+  /* ------------------------------------------------------------------------ */
 
-  // Cancel edit mode
-  const cancelEdit = () => {
-    setIsEditing(false)
-    setEditDraft(null)
-  }
-
-  // Close view dialog
-  const closeView = () => {
-    setViewingLead(null)
-    setIsEditing(false)
-    setEditDraft(null)
-  }
-
-  // Update status directly from view (non-edit mode)
-  const updateViewStatus = (status: LeadStatus) => {
-    if (!viewingLead) return
-    const updated = { ...viewingLead, status }
-    setViewingLead(updated)
-    setLeads((p) => p.map((l) => l.id === updated.id ? updated : l))
-  }
-
-  // const handleDeleteLead = (id: string) => {
-  //   setLeads((p) => p.filter((l) => l.id !== id))
-  //   closeView()
-  // }
-const handleDeleteLead = async (id: string) => {
-  try {
-    const supabase = getSupabaseClient()
+  async function getAccessToken() {
+    const supabase =
+      getSupabaseClient()
 
     const {
       data: { session },
-    } = await supabase.auth.getSession()
+    } =
+      await supabase.auth.getSession()
 
-    const token = session?.access_token
-
-    if (!token) {
-      throw new Error("Please sign in.")
-    }
-
-    const response = await fetch(
-      `/api/leads/${id}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json()
-
+    if (
+      !session?.access_token
+    ) {
       throw new Error(
-        errorData.error ?? "Failed to delete lead."
+        "Please sign in to manage contacts."
       )
     }
 
-    setLeads((current) =>
-      current.filter(
-        (lead) => lead.id !== id
-      )
-    )
-
-    closeView()
-  } catch (error) {
-    console.error(error)
-
-    setError(
-      error instanceof Error
-        ? error.message
-        : "Failed to delete lead."
-    )
+    return session.access_token
   }
-}
 
-
-  const closeCreateModal = () => {
-  setIsCreateOpen(false)
-
-  setCreateDraft({
-    leadName: "",
-    company: "",
-    email: "",
-    phone: "",
-    status: "discovery",
-  })
-}
-
-  // --- data fetching from supabase
+  /* ------------------------------------------------------------------------ */
+  /*                               INITIAL DATA                               */
+  /* ------------------------------------------------------------------------ */
 
   useEffect(() => {
-  async function loadLeads(showLoader = false) {
-    if (showLoader) {
-      setLoading(true)
+    async function loadData() {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const token =
+          await getAccessToken()
+
+        const headers = {
+          Authorization:
+            `Bearer ${token}`,
+        }
+
+        const [
+          contactsResponse,
+          clientsResponse,
+          branchesResponse,
+        ] =
+          await Promise.all([
+            fetch(
+              "/api/contacts",
+              {
+                headers,
+                cache:
+                  "no-store",
+              }
+            ),
+
+            fetch(
+              "/api/clients",
+              {
+                headers,
+                cache:
+                  "no-store",
+              }
+            ),
+
+            fetch(
+              "/api/branches",
+              {
+                headers,
+                cache:
+                  "no-store",
+              }
+            ),
+          ])
+
+        const contactsData =
+          (await contactsResponse.json()) as ContactsResponse
+
+        const clientsData =
+          (await clientsResponse.json()) as ClientsResponse
+
+        const branchesData =
+          (await branchesResponse.json()) as BranchesResponse
+
+        if (
+          !contactsResponse.ok
+        ) {
+          throw new Error(
+            contactsData.error ??
+              "Failed to load contacts."
+          )
+        }
+
+        if (
+          !clientsResponse.ok
+        ) {
+          throw new Error(
+            clientsData.error ??
+              "Failed to load clients."
+          )
+        }
+
+        if (
+          !branchesResponse.ok
+        ) {
+          throw new Error(
+            branchesData.error ??
+              "Failed to load branches."
+          )
+        }
+
+        setContacts(
+          contactsData.contacts ??
+            []
+        )
+
+        setClients(
+          clientsData.clients ??
+            []
+        )
+
+        setBranches(
+          branchesData.branches ??
+            []
+        )
+      } catch (
+        caughtError
+      ) {
+        console.error(
+          caughtError
+        )
+
+        setError(
+          caughtError instanceof
+            Error
+            ? caughtError.message
+            : "Failed to load contacts."
+        )
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void loadData()
+  }, [])
+
+  /* ------------------------------------------------------------------------ */
+  /*                                  HELPER                                  */
+  /* ------------------------------------------------------------------------ */
+
+  function enrichContact(
+    contact: Contact,
+    clientId:
+      string = contact.client_id
+  ): Contact {
+    const client =
+      clients.find(
+        (item) =>
+          item.id === clientId
+      )
+
+    return {
+      ...contact,
+
+      clients:
+        client
+          ? {
+              id:
+                client.id,
+
+              company_name:
+                client.company_name,
+            }
+          : contact.clients,
+    }
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                                  CREATE                                  */
+  /* ------------------------------------------------------------------------ */
+
+  function openCreate() {
+    setError(null)
+
+    setCreateDraft({
+      ...DEFAULT_CONTACT_DRAFT,
+    })
+
+    setCreateOpen(true)
+  }
+
+  function closeCreate() {
+    if (saving) {
+      return
+    }
+
+    setCreateOpen(false)
+
+    setCreateDraft({
+      ...DEFAULT_CONTACT_DRAFT,
+    })
+  }
+
+  async function createContact() {
+    if (
+      !createDraft.name.trim() ||
+      !createDraft.client_id ||
+      !createDraft.branch_id
+    ) {
+      setError(
+        "Contact name, client and branch are required."
+      )
+
+      return
     }
 
     try {
+      setSaving(true)
       setError(null)
 
-      const supabase = getSupabaseClient()
+      const token =
+        await getAccessToken()
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const response =
+        await fetch(
+          "/api/contacts",
+          {
+            method:
+              "POST",
 
-      const token = session?.access_token
+            headers: {
+              "Content-Type":
+                "application/json",
 
-      if (!token) {
-        throw new Error("Please sign in to load leads.")
-      }
+              Authorization:
+                `Bearer ${token}`,
+            },
 
-      const response = await fetch("/api/contacts", {
-        cache: "no-store",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+            body:
+              JSON.stringify(
+                createDraft
+              ),
+          }
+        )
 
-      if (!response.ok) {
-        const responseData = (await response.json()) as {
+      const data =
+        (await response.json()) as {
+          contact?: Contact
           error?: string
         }
 
+      if (
+        !response.ok ||
+        !data.contact
+      ) {
         throw new Error(
-          responseData.error ?? "Failed to load leads."
+          data.error ??
+            "Failed to create contact."
         )
       }
 
-      const data = (await response.json()) as {
-        contacts: Contact[]
-        status?: string
-      }
+      const createdContact =
+        enrichContact(
+          data.contact,
+          createDraft.client_id
+        )
 
-      setLeads(data.contacts ?? [])
-    } catch {
-      setError("Failed to load leads.")
+      setContacts(
+        (current) => [
+          createdContact,
+          ...current,
+        ]
+      )
+
+      showNotification(
+        "Contact created",
+        `"${createdContact.name}" was added successfully.`
+      )
+
+      setCreateOpen(false)
+
+      setCreateDraft({
+        ...DEFAULT_CONTACT_DRAFT,
+      })
+    } catch (
+      caughtError
+    ) {
+      console.error(
+        caughtError
+      )
+
+      setError(
+        caughtError instanceof
+          Error
+          ? caughtError.message
+          : "Failed to create contact."
+      )
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  loadLeads(true)
-}, [])
+  /* ------------------------------------------------------------------------ */
+  /*                                   VIEW                                   */
+  /* ------------------------------------------------------------------------ */
 
-// ----------------
+  function viewContact(
+    contact: Contact
+  ) {
+    setError(null)
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+    setEditDraft(null)
+
+    setSelectedContact(
+      contact
+    )
+  }
+
+  function closeContactModal() {
+    if (saving) {
+      return
+    }
+
+    setSelectedContact(null)
+    setEditDraft(null)
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                                   EDIT                                   */
+  /* ------------------------------------------------------------------------ */
+
+  function startEditing() {
+    if (!selectedContact) {
+      return
+    }
+
+    setEditDraft(
+      contactToDraft(
+        selectedContact
+      )
+    )
+  }
+
+  async function updateContact() {
+    if (
+      !selectedContact ||
+      !editDraft
+    ) {
+      return
+    }
+
+    if (
+      !editDraft.name.trim() ||
+      !editDraft.client_id ||
+      !editDraft.branch_id
+    ) {
+      setError(
+        "Contact name, client and branch are required."
+      )
+
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError(null)
+
+      const token =
+        await getAccessToken()
+
+      const response =
+        await fetch(
+          `/api/contacts/${selectedContact.id}`,
+          {
+            method:
+              "PUT",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${token}`,
+            },
+
+            body:
+              JSON.stringify(
+                editDraft
+              ),
+          }
+        )
+
+      const data =
+        (await response.json()) as {
+          contact?: Contact
+          error?: string
+        }
+
+      if (
+        !response.ok ||
+        !data.contact
+      ) {
+        throw new Error(
+          data.error ??
+            "Failed to update contact."
+        )
+      }
+
+      const updatedContact =
+        enrichContact(
+          data.contact,
+          editDraft.client_id
+        )
+
+      setContacts(
+        (current) =>
+          current.map(
+            (contact) =>
+              contact.id ===
+              updatedContact.id
+                ? updatedContact
+                : contact
+          )
+      )
+
+      showNotification(
+        "Contact updated",
+        `"${updatedContact.name}" changes were saved.`
+      )
+
+      /*
+       * Successful save automatically
+       * closes the edit/view modal.
+       */
+      setSelectedContact(null)
+      setEditDraft(null)
+    } catch (
+      caughtError
+    ) {
+      console.error(
+        caughtError
+      )
+
+      setError(
+        caughtError instanceof
+          Error
+          ? caughtError.message
+          : "Failed to update contact."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                                  DELETE                                  */
+  /* ------------------------------------------------------------------------ */
+
+  async function deleteContact() {
+    if (!selectedContact) {
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError(null)
+
+      const token =
+        await getAccessToken()
+
+      const response =
+        await fetch(
+          `/api/contacts/${selectedContact.id}`,
+          {
+            method:
+              "DELETE",
+
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+          }
+        )
+
+      const data =
+        (await response.json()) as {
+          error?: string
+        }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ??
+            "Failed to delete contact."
+        )
+      }
+
+      setContacts(
+        (current) =>
+          current.filter(
+            (contact) =>
+              contact.id !==
+              selectedContact.id
+          )
+      )
+
+      showNotification(
+        "Contact deleted",
+        `"${selectedContact.name}" was removed.`
+      )
+
+      setSelectedContact(null)
+      setEditDraft(null)
+    } catch (
+      caughtError
+    ) {
+      console.error(
+        caughtError
+      )
+
+      setError(
+        caughtError instanceof
+          Error
+          ? caughtError.message
+          : "Failed to delete contact."
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*                                  RENDER                                  */
+  /* ------------------------------------------------------------------------ */
+
   return (
     <>
-      
-      <div className="lp-content">
+      {/* -------------------------------------------------------------- */}
+      {/* Enterprise Action Notification                                 */}
+      {/* -------------------------------------------------------------- */}
 
-        {/* ── Stat Cards ─────────────────────────────────────────────────── */}
-        {/* <div className="lp-stats">
-          <div className="lp-stat-card">
-            <div className="lp-stat-label">TOTAL LEADS</div>
-            <div className="lp-stat-val lp-stat-white">{stats.total}</div>
-            <div className="lp-stat-change lp-up">↑ +12 This week</div>
-          </div>
-          <div className="lp-stat-card">
-            <div className="lp-stat-label">NEW LEADS</div>
-            <div className="lp-stat-val lp-stat-amber">{stats.newLeads}</div>
-            <div className="lp-stat-sub">Awaiting response</div>
-          </div>
-          <div className="lp-stat-card">
-            <div className="lp-stat-label">CONTACTED</div>
-            <div className="lp-stat-val lp-stat-blue">{stats.contacted}</div>
-            <div className="lp-stat-sub lp-stat-blue-sub">In Progress</div>
-          </div>
-          <div className="lp-stat-card">
-            <div className="lp-stat-label">CONVERTED</div>
-            <div className="lp-stat-val lp-stat-green">{stats.converted}</div>
-            <div className="lp-stat-change lp-up">↑ Increased</div>
-          </div>
-        </div> */}
+      {notification && (
+        <div className="pointer-events-none fixed right-5 top-20 z-[250] w-[calc(100%-2.5rem)] max-w-[370px]">
+          <ActionNotification
+            key={
+              notification.id
+            }
+            title={
+              notification.title
+            }
+            message={
+              notification.message
+            }
+            type={
+              notification.type
+            }
+            onClose={() =>
+              setNotification(
+                null
+              )
+            }
+          />
+        </div>
+      )}
 
-        {/* ── Tabs ───────────────────────────────────────────────────────── */}
-        {/* <div className="lp-tabs">
-          {(["all", "archived", "existing"] as const).map((tab) => (
+      <main className="min-h-screen bg-[#141416] px-4 py-5 sm:px-6">
+        <ContactsStats
+          total={
+            stats.total
+          }
+          reachable={
+            stats.reachable
+          }
+          complete={
+            stats.complete
+          }
+          clientsCovered={
+            stats.clientsCovered
+          }
+        />
+
+        {/* Tabs */}
+
+        <div className="mt-6 flex overflow-x-auto border-b border-[#282c34]">
+          {(
+            [
+              [
+                "all",
+                "All",
+              ],
+              [
+                "complete",
+                "Complete",
+              ],
+              [
+                "incomplete",
+                "Incomplete",
+              ],
+            ] as const
+          ).map(
+            ([
+              key,
+              label,
+            ]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() =>
+                  setActiveTab(
+                    key
+                  )
+                }
+                className={`relative flex shrink-0 items-center gap-2 px-4 py-3 text-sm font-medium transition ${
+                  activeTab ===
+                  key
+                    ? "text-[#d9dde5]"
+                    : "text-[#777e8d] hover:text-[#b8bdc8]"
+                }`}
+              >
+                {label}
+
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] ${
+                    activeTab ===
+                    key
+                      ? "bg-blue-500/15 text-blue-400"
+                      : "bg-white/[0.04] text-[#747b8a]"
+                  }`}
+                >
+                  {
+                    tabCounts[
+                      key
+                    ]
+                  }
+                </span>
+
+                {activeTab ===
+                  key && (
+                  <span className="absolute inset-x-0 bottom-0 h-0.5 bg-blue-500" />
+                )}
+              </button>
+            )
+          )}
+        </div>
+
+        {/* Error */}
+
+        {error && (
+          <div className="mt-4 flex items-start justify-between rounded-lg border border-red-500/25 bg-red-500/[0.07] px-4 py-3 text-sm text-red-300">
+            <span>
+              {error}
+            </span>
+
             <button
-              key={tab}
-              className={`lp-tab ${activeTab === tab ? "lp-tab-active" : ""}`}
-              onClick={() => setActiveTab(tab)}
+              type="button"
+              onClick={() =>
+                setError(null)
+              }
+              className="ml-4 text-red-400 transition hover:text-red-200"
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              <span className="lp-tab-count">{tabCounts[tab]}</span>
+              <X size={16} />
             </button>
-          ))}
-        </div> */}
-
-        {/* ── Filters ────────────────────────────────────────────────────── */}
-        <div className="lp-filters">
-          <div className="lp-search">
-            <Search size={13} color="#3d4450" />
-            <input
-              className="lp-search-input"
-              placeholder="Search by client, quote ID..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
           </div>
-          {/* <select
-            className="lp-select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as "all" | LeadStatus)}
-          >
-            <option value="all">All Status</option>
-            <option value="discovery">Discovery</option>
-            <option value="contacted">Contacted</option>
-            <option value="reviewing">Reviewed</option>
-            <option value="closed-won">Found</option>
-            <option value="closed-lost">Not Found</option>
-            {/* <option value="converted">Converted</option> */}
-         {/*} </select>
-          <select className="lp-select" value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="all">All time</option>
-            <option value="30d">Last 30 days</option>
-            <option value="90d">Last 90 days</option>
-            <option value="1y">Last year</option>
-          </select> */}
-          <CreateLeadButton
-  onClick={() => {
-    setCreateDraft({
-      leadName: "",
-      company: "",
-      email: "",
-      phone: "",
-      status: "discovery",
-    })
+        )}
 
-    setIsCreateOpen(true)
-  }}
-/>
-        </div>
-
-        {/* ── Table ──────────────────────────────────────────────────────── */}
-        <div className="lp-table-wrap">
-          <table className="lp-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>NAME</th>
-                <th>DESIGNATION</th>
-                <th>EMAIL</th>
-                <th>PHONE</th>
-                <th>CLIENT</th>
-                <th>VIEW</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="lp-empty">
-                    <div style={{ fontSize: 28, marginBottom: 8 }}>🎯</div>
-                    <div>No leads found</div>
-                  </td>
-                </tr>
-              ) : filtered.map((lead) => (
-                <tr key={lead.id} className="lp-row">
-                  {/* Contact ID */}
-                  <td className="lp-id">{lead.id}</td>
-                  {/* Contact Name */}
-                  <td>
-                    <div className="lp-name-cell">
-                      <div
-                        className="lp-avatar"
-                        style={{ background: `black`, color: 'white' }}
-                      >
-                        {getInitials(lead.name)}
-                      </div>
-                      <div>
-                        <div className="lp-name">{lead.name}</div>
-                        {/* <div className="lp-org">{lead.company}</div> */}
-                      </div>
-                    </div>
-                  </td>
-                  {/* Contact email */}
-                  <td className="lp-muted">{lead.email}</td>
-                   {/* Contact designation */}
-                  <td className="lp-muted">{lead.designation}</td>
-                  {/* Contact phone */}
-                  <td className="lp-muted">{lead.phone}</td>
-                  {/* <td>
-                    <span
-                      className="lp-badge"
-                      style={{
-                        background: statusConfig[lead.status].bg,
-                        color: statusConfig[lead.status].color,
-                        borderColor: statusConfig[lead.status].color + "33",
-                      }}
-                    >
-                      <span className="lp-dot" style={{ background: statusConfig[lead.status].dot }} />
-                      {statusConfig[lead.status].label}
-                    </span>
-                  </td> */}
-
-                   {/* Contact client name */}
-                  <td className="lp-muted">{lead.clients?.company_name || ''}</td>
-                  {/* Contact View Icon */}
-                  <td>
-                    <div className="lp-actions">
-                      <button
-                        className="lp-icon-btn"
-                        title="View"
-                        onClick={() => openView(lead)}
-                      >
-                        <Eye size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ── View / Edit Lead Dialog ──────────────────────────────────────────── */}
-      {/* {viewingLead && !isEditing && (
-        <ViewLead
-          lead={viewingLead}
-          statusConfig={statusConfig}
-          closeView={closeView}
-          startEdit={startEdit}
-          handleDeleteLead={handleDeleteLead}
-          updateViewStatus={updateViewStatus}
+        <ContactsFilters
+          query={
+            query
+          }
+          clientFilter={
+            clientFilter
+          }
+          periodFilter={
+            periodFilter
+          }
+          clients={
+            clients
+          }
+          onQueryChange={
+            setQuery
+          }
+          onClientChange={
+            setClientFilter
+          }
+          onPeriodChange={
+            setPeriodFilter
+          }
+          onAddContact={
+            openCreate
+          }
         />
-      )} */}
 
-      {/* {editDraft && isEditing && (
-        <EditLead
-          editDraft={editDraft}
-          setEditDraft={setEditDraft}
-          statusConfig={statusConfig}
-          saveEdit={saveEdit}
-          cancelEdit={cancelEdit}
+        <ContactsTable
+          contacts={
+            filteredContacts
+          }
+          totalContacts={
+            contacts.length
+          }
+          loading={
+            loading
+          }
+          clientNameById={
+            clientNameById
+          }
+          onView={
+            viewContact
+          }
         />
-      )} */}
+      </main>
 
-      {/* ── Create Lead Modal ──────────────────────────────────────────────────── */}
-    
+      {/* Create */}
 
-      {/* {isCreateOpen && (
-       <CreateLeadModal
-  createDraft={createDraft}
-  setCreateDraft={setCreateDraft}
-  saveCreate={createLead}
-  onClose={closeCreateModal}
-/>
-        )} */}
+      {createOpen && (
+        <ContactForm
+          title="Add Contact"
+          description="Create a new client contact."
+          draft={
+            createDraft
+          }
+          clients={
+            clients
+          }
+          branches={
+            branches
+          }
+          saving={
+            saving
+          }
+          submitLabel="Create Contact"
+          onChange={
+            setCreateDraft
+          }
+          onSubmit={
+            createContact
+          }
+          onClose={
+            closeCreate
+          }
+        />
+      )}
 
-      {/* ── New Lead Dialog ──────────────────────────────────────────────────── */}
-    
+      {/* View */}
 
-      {/* ── All styles ───────────────────────────────────────────────────────── */}
-      <style>{`
+      {selectedContact &&
+        !editDraft && (
+          <ContactDetails
+            contact={
+              selectedContact
+            }
+            clientName={
+              selectedContact
+                .clients
+                ?.company_name ??
+              clientNameById.get(
+                selectedContact.client_id
+              ) ??
+              ""
+            }
+            branchName={
+              branchNameById.get(
+                selectedContact.branch_id
+              ) ?? ""
+            }
+            saving={
+              saving
+            }
+            onClose={
+              closeContactModal
+            }
+            onEdit={
+              startEditing
+            }
+            onDelete={
+              deleteContact
+            }
+          />
+        )}
 
-        /* ── Page-level header (outside lp-content) ───────────────────────── */
-        .lp-page-header {
-          display: flex;
-          width:100%;
-          justify-content: space-between;
-          align-items: center;
-          padding: 20px 24px 20px;
-          background: #171A21;
-          position: sticky;
-          top: 56px;
-          z-index: 4;
-        }
-        .lp-page-title {
-          font-size: 24px;
-          font-weight: 700;
-          color: #e0e3ea;
-          margin: 0;
-        }
-        .lp-header-btn {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: #e5e7eb;
-          color: #111827;
-          border: none;
-          border-radius: 10px;
-          padding: 9px 16px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          font-family: inherit;
-          transition: background 0.15s;
-        }
-        .lp-header-btn:hover { background: #d1d5db; }
+      {/* Edit */}
 
-        /* ── Layout ───────────────────────────────────────────────────────── */
-        .lp-content {
-          width: 100%;
-          padding: 20px 24px 24px;
-          background: #141416;
-          min-height: calc(100vh - 56px);
-          box-sizing: border-box;
-        } 
-
-        /* ── Stat Cards ───────────────────────────────────────────────────── */
-        .lp-stats {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
-          margin-bottom: 24px;
-        }
-        .lp-stat-card {
-          background: #161920;
-          border: 1px solid #646465;
-          border-radius: 10px;
-          padding: 18px 20px 16px;
-        }
-        .lp-stat-label {
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          color: #3d4450;
-          text-transform: uppercase;
-          margin-bottom: 8px;
-        }
-        .lp-stat-val {
-          font-size: 32px;
-          font-weight: 700;
-          line-height: 1;
-          margin-bottom: 8px;
-          letter-spacing: -0.5px;
-        }
-        .lp-stat-white  { color: #e0e3ea; }
-        .lp-stat-amber  { color: #d3a335; }
-        .lp-stat-blue   { color: #4c7ee1; }
-        .lp-stat-green  { color: #1ead82; }
-
-        .lp-stat-change { font-size: 11px; color: #3d4450; }
-        .lp-stat-change.lp-up { color: #1ead82; }
-        .lp-stat-sub { font-size: 11px; color: #3d4450; }
-        .lp-stat-blue-sub { color: #4c7ee1 !important; }
-
-        /* ── Tabs ─────────────────────────────────────────────────────────── */
-        .lp-tabs {
-          display: flex;
-          gap: 0;
-          margin-bottom: 16px;
-          border-bottom: 1px solid #1d2027;
-        }
-        .lp-tab {
-          background: none;
-          border: none;
-          border-bottom: 2px solid transparent;
-          padding: 8px 16px 10px;
-          font-size: 13px;
-          font-weight: 500;
-          color: #5a6070;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: -1px;
-          transition: color 0.15s;
-          font-family: inherit;
-        }
-        .lp-tab:hover { color: #c8d0e0; }
-        .lp-tab-active { color: #c8d0e0 !important; border-bottom-color: #4c7ee1; }
-        .lp-tab-count { font-size: 11px; color: #3d4450; }
-        .lp-tab-active .lp-tab-count { color: #4c7ee1; }
-
-        /* ── Filters ──────────────────────────────────────────────────────── */
-        .lp-filters {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 0;
-        }
-        .lp-search {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: #21252e;
-          border: 1px solid #2a2f3a;
-          border-radius: 8px;
-          padding: 7px 12px;
-          flex: 1;
-          max-width: 300px;
-        }
-        .lp-search-input {
-          background: none;
-          border: none;
-          outline: none;
-          font-size: 13px;
-          color: #c8d0e0;
-          width: 100%;
-          font-family: inherit;
-        }
-        .lp-search-input::placeholder { color: #3d4450; }
-        .lp-select {
-          background: #21252e;
-          border: 1px solid #2a2f3a;
-          border-radius: 8px;
-          padding: 7px 30px 7px 12px;
-          font-size: 13px;
-          color: #c8d0e0;
-          cursor: pointer;
-          outline: none;
-          font-family: inherit;
-          appearance: none;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%233d4450' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 10px center;
-        }
-        .lp-select option { background: #161920; color: #c8d0e0; }
-
-        /* ── Table ────────────────────────────────────────────────────────── */
-        .lp-table-wrap {
-          margin-top: 16px;
-          border: 1px solid #2b313c;
-          border-radius: 14px;
-          overflow: hidden;
-        }
-        .lp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .lp-table thead tr { background: #1F2128; }
-        .lp-table th {
-          padding: 10px 16px;
-          text-align: left;
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.07em;
-          color: #3d4450;
-          text-transform: uppercase;
-          white-space: nowrap;
-        }
-        .lp-row { background: #171A21; transition: all 0.12s ease; }
-        .lp-row:hover { background: #222833; transform: translateY(-1px); }
-        .lp-table td { padding: 12px 16px; vertical-align: middle; }
-        .lp-id { font-size: 12px; color: #929499; font-weight: 500; white-space: nowrap; }
-        .lp-name-cell { display: flex; align-items: center; gap: 10px; }
-        .lp-avatar {
-          width: 30px; height: 30px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 11px; font-weight: 700; flex-shrink: 0;
-        }
-        .lp-name { font-size: 13px; font-weight: 500; color: #c2c8cc; line-height: 1.3; }
-        .lp-org { font-size: 11px; color: #9e9fa0; margin-top: 1px; }
-        .lp-muted { color: #9ba0ae; font-size: 13px; }
-
-        /* ── Badge ────────────────────────────────────────────────────────── */
-        .lp-badge {
-          display: inline-flex; align-items: center; gap: 5px;
-          padding: 3px 9px; border-radius: 20px;
-          font-size: 11px; font-weight: 500;
-          border: 1px solid transparent; white-space: nowrap;
-        }
-        .lp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-
-        /* ── Row actions ──────────────────────────────────────────────────── */
-        .lp-actions { display: flex; align-items: center; gap: 4px; }
-        .lp-icon-btn {
-          background: none; border: none; color: #3d4450; cursor: pointer;
-          padding: 5px; border-radius: 6px; display: flex; align-items: center;
-          transition: color 0.12s, background 0.12s;
-        }
-        .lp-icon-btn:hover { color: #c8d0e0; background: rgba(255,255,255,0.05); }
-
-        /* ── Empty state ──────────────────────────────────────────────────── */
-        .lp-empty { text-align: center; padding: 48px 16px; color: #3d4450; font-size: 13px; }
-
-        /* ── Overlay ──────────────────────────────────────────────────────── */
-        .lp-overlay {
-          position: fixed; inset: 0; z-index: 100;
-          background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
-          display: flex; align-items: center; justify-content: center; padding: 20px;
-        }
-
-        /* ── View Dialog ──────────────────────────────────────────────────── */
-        .lp-view-dialog {
-          background: #161920; border: 1px solid #2a2f3a; border-radius: 12px;
-          width: 100%; max-width: 520px;
-          box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-          animation: lp-in 0.16s ease; overflow: hidden;
-        }
-        .lp-view-topbar {
-          display: flex; align-items: center;
-          justify-content: space-between; padding: 16px 20px;
-        }
-        .lp-view-status-wrap { display: flex; align-items: center; gap: 10px; }
-        .lp-view-status-label { font-size: 13px; font-weight: 500; color: #c8d0e0; }
-        .lp-view-status-select-wrap {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 4px 10px; border-radius: 20px;
-          font-size: 12px; font-weight: 500;
-          border: 1px solid transparent; background: #21252e;
-        }
-        .lp-view-status-select {
-          background: transparent; border: none; outline: none;
-          font-size: 12px; font-weight: 500; cursor: pointer;
-          font-family: inherit; appearance: none; padding-right: 14px;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ba0ae' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-          background-repeat: no-repeat; background-position: right 0px center;
-        }
-        .lp-view-status-select option { background: #161920; color: #c8d0e0; }
-        .lp-view-topbar-actions { display: flex; align-items: center; gap: 8px; }
-        .lp-view-edit-btn {
-          background: #21252e; border: 1px solid #2a2f3a; border-radius: 7px;
-          padding: 6px 8px; color: #9ba0ae; cursor: pointer;
-          display: flex; align-items: center;
-          transition: color 0.12s, border-color 0.12s;
-        }
-        .lp-view-edit-btn:hover { color: #c8d0e0; border-color: #3d4450; }
-
-        /* Save / Cancel buttons in edit mode */
-        .lp-save-btn {
-          display: flex; align-items: center; gap: 5px;
-          background: #1ead82; border: none; border-radius: 7px;
-          padding: 6px 14px; font-size: 12px; font-weight: 500;
-          color: #fff; cursor: pointer; font-family: inherit;
-          transition: background 0.14s;
-        }
-        .lp-save-btn:hover { background: #18c491; }
-        .lp-cancel-edit-btn {
-          background: none; border: 1px solid #2a2f3a; border-radius: 7px;
-          padding: 6px 12px; font-size: 12px; font-weight: 500;
-          color: #5a6070; cursor: pointer; font-family: inherit;
-          transition: color 0.14s, border-color 0.14s;
-        }
-        .lp-cancel-edit-btn:hover { color: #c8d0e0; border-color: #3d4450; }
-
-        .lp-make-deal-btn {
-          background: none; border: 1px solid #1ead82; border-radius: 7px;
-          padding: 6px 14px; font-size: 12px; font-weight: 500;
-          color: #1ead82; cursor: pointer; font-family: inherit;
-          transition: background 0.14s;
-        }
-        .lp-make-deal-btn:hover { background: rgba(30,173,130,0.1); }
-
-        .lp-view-divider { height: 1px; background: #1e2229; margin: 0 20px; }
-        .lp-view-body { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-        .lp-view-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .lp-view-field {
-          background: #1e2229; border: 1px solid #252b35;
-          border-radius: 8px; padding: 12px 14px;
-        }
-        .lp-view-field-label {
-          font-size: 9px; font-weight: 600; letter-spacing: 0.08em;
-          color: #3d4450; text-transform: uppercase; margin-bottom: 5px;
-        }
-        .lp-view-field-val { font-size: 13px; color: #c2c8cc; font-weight: 400; }
-
-        /* Inline inputs inside view field cards */
-        .lp-inline-input {
-          background: transparent; border: none; border-bottom: 1px solid #3d4450;
-          outline: none; font-size: 13px; color: #c8d0e0;
-          width: 100%; padding: 2px 0; font-family: inherit;
-          transition: border-color 0.14s;
-        }
-        .lp-inline-input:focus { border-bottom-color: #4c7ee1; }
-        .lp-inline-input::placeholder { color: #3d4450; }
-
-        .lp-view-notes-field {
-          background: #1e2229; border: 1px solid #252b35;
-          border-radius: 8px; padding: 12px 14px; min-height: 72px;
-        }
-        .lp-view-notes-val { margin-top: 4px; color: #5a6070; }
-
-        /* Inline textarea for notes */
-        .lp-inline-textarea {
-          background: transparent; border: none; outline: none;
-          font-size: 13px; color: #c8d0e0; width: 100%;
-          resize: none; min-height: 48px; font-family: inherit;
-          padding: 2px 0; line-height: 1.5;
-          border-bottom: 1px solid #3d4450;
-          transition: border-color 0.14s;
-        }
-        .lp-inline-textarea:focus { border-bottom-color: #4c7ee1; }
-        .lp-inline-textarea::placeholder { color: #3d4450; }
-
-        .lp-view-footer { padding: 0 20px 18px; display: flex; align-items: center; }
-        .lp-delete-btn {
-          background: none; border: 1px solid rgba(196,96,111,0.4);
-          border-radius: 7px; padding: 6px 14px;
-          font-size: 12px; font-weight: 500; color: #c4606f;
-          cursor: pointer; font-family: inherit;
-          transition: background 0.14s, border-color 0.14s;
-        }
-        .lp-delete-btn:hover { background: rgba(196,96,111,0.1); border-color: #c4606f; }
-
-        /* ── New Lead Dialog ──────────────────────────────────────────────── */
-        .lp-dialog {
-          background: #161920; border: 1px solid #2a2f3a; border-radius: 12px;
-          width: 100%; max-width: 500px;
-          box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-          animation: lp-in 0.16s ease;
-        }
-        @keyframes lp-in {
-          from { opacity: 0; transform: translateY(10px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .lp-dialog-header {
-          display: flex; align-items: center;
-          justify-content: space-between; padding: 18px 20px 0;
-        }
-        .lp-dialog-title { font-size: 14px; font-weight: 600; color: #c8d0e0; }
-        .lp-dialog-close {
-          background: none; border: none; color: #5a6070; cursor: pointer;
-          padding: 4px; border-radius: 6px; display: flex; align-items: center;
-          transition: color 0.12s;
-        }
-        .lp-dialog-close:hover { color: #c8d0e0; }
-        .lp-dialog-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
-        .lp-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 18px; }
-        .lp-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .lp-field { display: flex; flex-direction: column; gap: 5px; }
-        .lp-field label {
-          font-size: 10px; font-weight: 600; text-transform: uppercase;
-          letter-spacing: 0.07em; color: #3d4450;
-        }
-        .lp-field input, .lp-field select {
-          background: #1e2329; border: 1px solid #2a2f3a; border-radius: 7px;
-          padding: 8px 11px; font-size: 13px; color: #c8d0e0; outline: none;
-          transition: border-color 0.14s; font-family: inherit;
-        }
-        .lp-field input::placeholder { color: #3d4450; }
-        .lp-field input:focus, .lp-field select:focus { border-color: #4c7ee1; }
-        .lp-field select option { background: #161920; }
-
-        .lp-btn-ghost {
-          background: none; border: 1px solid #2a2f3a; border-radius: 7px;
-          padding: 7px 14px; font-size: 13px; color: #5a6070; cursor: pointer;
-          font-family: inherit; transition: color 0.14s, border-color 0.14s;
-        }
-        .lp-btn-ghost:hover { color: #c8d0e0; border-color: #3d4450; }
-        .lp-btn-primary {
-          background: #4c7ee1; border: none; border-radius: 7px;
-          padding: 7px 14px; font-size: 13px; font-weight: 500; color: #fff;
-          cursor: pointer; font-family: inherit;
-          transition: background 0.14s, opacity 0.14s;
-        }
-        .lp-btn-primary:hover:not(:disabled) { background: #3a6dd0; }
-        .lp-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-      `}</style>
+      {selectedContact &&
+        editDraft && (
+          <ContactForm
+            title="Edit Contact"
+            description={
+              selectedContact.name
+            }
+            draft={
+              editDraft
+            }
+            clients={
+              clients
+            }
+            branches={
+              branches
+            }
+            saving={
+              saving
+            }
+            submitLabel="Save Changes"
+            onChange={(
+              updatedDraft
+            ) =>
+              setEditDraft(
+                updatedDraft
+              )
+            }
+            onSubmit={
+              updateContact
+            }
+            onClose={() => {
+              if (!saving) {
+                setEditDraft(
+                  null
+                )
+              }
+            }}
+          />
+        )}
     </>
   )
 }

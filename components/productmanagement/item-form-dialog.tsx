@@ -1,15 +1,27 @@
-import React, { useEffect, useState } from "react"
+import React, { useState } from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
-import { ItemKind, ItemStatus, ItemType } from "./types"
+
+import {
+  ItemKind,
+  ItemStatus,
+  ItemType,
+} from "./types"
+
 import { RadixSelect } from "./radix-select"
 import { typeConfig, statusConfig } from "./config"
 
 interface ItemFormDialogProps {
   open: boolean
   kind: ItemKind
+  saving: boolean
+
   onClose: () => void
-  onCreate: (kind: ItemKind, payload: Record<string, any>) => void
+
+  onCreate: (
+    kind: ItemKind,
+    payload: Record<string, unknown>
+  ) => Promise<void>
 }
 
 const EMPTY_FORM = {
@@ -17,7 +29,6 @@ const EMPTY_FORM = {
   code: "",
   category: "",
   type: "core" as ItemType,
-  duration: "",
   price: "",
   tax_percentage: "18",
   status: "active" as ItemStatus,
@@ -25,161 +36,455 @@ const EMPTY_FORM = {
   notes: "",
 }
 
-export function ItemFormDialog({ open, kind, onClose, onCreate }: ItemFormDialogProps) {
+export function ItemFormDialog({
+  open,
+  kind,
+  saving,
+  onClose,
+  onCreate,
+}: ItemFormDialogProps) {
   const [form, setForm] = useState(EMPTY_FORM)
-  const isProduct = kind === "product"
 
-  // Reset the form whenever the dialog is (re)opened or the kind changes
-  useEffect(() => {
-    if (open) setForm(EMPTY_FORM)
-  }, [open, kind])
+  const isProduct =
+    kind === "product"
 
-  const update = (patch: Partial<typeof EMPTY_FORM>) => setForm((f) => ({ ...f, ...patch }))
-
-  const canSubmit = form.name.trim().length > 0 && form.code.trim().length > 0 && form.price.trim().length > 0
-
-  const handleSubmit = () => {
-    if (!canSubmit) return
-    onCreate(kind, {
-      name: form.name.trim(),
-      code: form.code.trim(),
-      category: form.category.trim(),
-      type: form.type,
-      duration: form.duration.trim(),
-      price: Number(form.price) || 0,
-      tax_percentage: Number(form.tax_percentage) || 0,
-      status: form.status,
-      description: form.description.trim(),
-      notes: form.notes.trim(),
-    })
+  const update = (
+    patch: Partial<
+      typeof EMPTY_FORM
+    >
+  ) => {
+    setForm((current) => ({
+      ...current,
+      ...patch,
+    }))
   }
 
+  const canSubmit =
+    form.name.trim().length > 0 &&
+    form.code.trim().length > 0 &&
+    form.price.trim().length > 0
+
+  const handleSubmit =
+    async () => {
+      if (
+        !canSubmit ||
+        saving
+      ) {
+        return
+      }
+
+      await onCreate(kind, {
+        name:
+          form.name.trim(),
+
+        code:
+          form.code.trim(),
+
+        category:
+          form.category.trim(),
+
+        type:
+          form.type,
+
+        price:
+          Number(form.price) ||
+          0,
+
+        tax_percentage:
+          Number(
+            form.tax_percentage
+          ) || 0,
+
+        status:
+          form.status,
+
+        description:
+          form.description.trim(),
+
+        notes:
+          form.notes.trim(),
+      })
+    }
+
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(
+        nextOpen
+      ) => {
+        if (
+          !nextOpen &&
+          !saving
+        ) {
+          onClose()
+        }
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="pm-overlay" />
-        <Dialog.Content className="pm-dialog" aria-describedby={undefined}>
+
+        <Dialog.Content
+          className="pm-dialog"
+          aria-describedby={
+            undefined
+          }
+        >
+          {/* Header */}
+
           <div className="pm-dialog-header">
-            <Dialog.Title className="pm-dialog-title">{isProduct ? "New Product" : "New Service"}</Dialog.Title>
-            <Dialog.Close asChild>
-              <button className="pm-dialog-close" aria-label="Close">
-                <X size={16} />
-              </button>
-            </Dialog.Close>
+            <Dialog.Title className="pm-dialog-title">
+              {isProduct
+                ? "New Product"
+                : "New Service"}
+            </Dialog.Title>
+
+            <button
+              type="button"
+              className="pm-dialog-close"
+              aria-label="Close"
+              disabled={saving}
+              onClick={onClose}
+            >
+              <X size={16} />
+            </button>
           </div>
+
+          {/* Form Body */}
 
           <div className="pm-dialog-body">
+
+            {/* Name + Code */}
+
             <div className="pm-form-row">
               <div className="pm-field">
-                <label>{isProduct ? "Product Name" : "Service Name"}</label>
+                <label>
+                  {isProduct
+                    ? "Product Name"
+                    : "Service Name"}
+                </label>
+
                 <input
-                  placeholder={isProduct ? "e.g. Pharmacy Suite" : "e.g. Onboarding & Setup"}
-                  value={form.name}
-                  onChange={(e) => update({ name: e.target.value })}
+                  autoFocus
+                  placeholder={
+                    isProduct
+                      ? "e.g. Pharmacy Suite"
+                      : "e.g. Annual Maintenance Contract"
+                  }
+                  value={
+                    form.name
+                  }
+                  disabled={
+                    saving
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    update({
+                      name:
+                        event
+                          .target
+                          .value,
+                    })
+                  }
                 />
               </div>
+
               <div className="pm-field">
-                <label>Code</label>
+                <label>
+                  Code
+                </label>
+
                 <input
-                  placeholder={isProduct ? "e.g. PHM-CORE" : "e.g. ONB-001"}
-                  value={form.code}
-                  onChange={(e) => update({ code: e.target.value })}
+                  placeholder={
+                    isProduct
+                      ? "e.g. MOD005"
+                      : "e.g. SER003"
+                  }
+                  value={
+                    form.code
+                  }
+                  disabled={
+                    saving
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    update({
+                      code:
+                        event
+                          .target
+                          .value,
+                    })
+                  }
                 />
               </div>
             </div>
 
+            {/* Category + Type */}
+
             <div className="pm-form-row">
               <div className="pm-field">
-                <label>Category</label>
+                <label>
+                  Category
+                </label>
+
                 <input
-                  placeholder="e.g. Pharmacy, Clinic, Support"
-                  value={form.category}
-                  onChange={(e) => update({ category: e.target.value })}
+                  placeholder={
+                    isProduct
+                      ? "e.g. Healthcare"
+                      : "e.g. Maintenance"
+                  }
+                  value={
+                    form.category
+                  }
+                  disabled={
+                    saving
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    update({
+                      category:
+                        event
+                          .target
+                          .value,
+                    })
+                  }
                 />
               </div>
+
               <div className="pm-field">
-                <label>Type</label>
+                <label>
+                  Type
+                </label>
+
                 <RadixSelect
-                  value={form.type}
-                  onChange={(v) => update({ type: v as ItemType })}
+                  value={
+                    form.type
+                  }
+                  onChange={(
+                    value
+                  ) =>
+                    update({
+                      type:
+                        value as ItemType,
+                    })
+                  }
                   options={[
-                    { value: "core", label: typeConfig.core.label },
-                    { value: "add_on", label: typeConfig.add_on.label },
+                    {
+                      value:
+                        "core",
+                      label:
+                        typeConfig
+                          .core
+                          .label,
+                    },
+                    {
+                      value:
+                        "add_on",
+                      label:
+                        typeConfig
+                          .add_on
+                          .label,
+                    },
                   ]}
                 />
               </div>
             </div>
 
-            <div className="pm-form-row">
-              {!isProduct && (
-                <div className="pm-field">
-                  <label>Duration</label>
-                  <input
-                    placeholder="e.g. 3 days, Ongoing"
-                    value={form.duration}
-                    onChange={(e) => update({ duration: e.target.value })}
-                  />
-                </div>
-              )}
-              <div className="pm-field">
-                <label>Status</label>
-                <RadixSelect
-                  value={form.status}
-                  onChange={(v) => update({ status: v as ItemStatus })}
-                  options={[
-                    { value: "active", label: statusConfig.active.label },
-                    { value: "inactive", label: statusConfig.inactive.label },
-                  ]}
-                />
-              </div>
-            </div>
+            {/* Status + Price */}
 
             <div className="pm-form-row">
               <div className="pm-field">
-                <label>Price (₹)</label>
+                <label>
+                  Status
+                </label>
+
+                <RadixSelect
+                  value={
+                    form.status
+                  }
+                  onChange={(
+                    value
+                  ) =>
+                    update({
+                      status:
+                        value as ItemStatus,
+                    })
+                  }
+                  options={[
+                    {
+                      value:
+                        "active",
+                      label:
+                        statusConfig
+                          .active
+                          .label,
+                    },
+                    {
+                      value:
+                        "inactive",
+                      label:
+                        statusConfig
+                          .inactive
+                          .label,
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className="pm-field">
+                <label>
+                  Price (₹)
+                </label>
+
                 <input
                   type="number"
+                  min="0"
+                  step="0.01"
                   placeholder="0"
-                  value={form.price}
-                  onChange={(e) => update({ price: e.target.value })}
-                />
-              </div>
-              <div className="pm-field">
-                <label>Tax %</label>
-                <input
-                  type="number"
-                  placeholder="18"
-                  value={form.tax_percentage}
-                  onChange={(e) => update({ tax_percentage: e.target.value })}
+                  value={
+                    form.price
+                  }
+                  disabled={
+                    saving
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    update({
+                      price:
+                        event
+                          .target
+                          .value,
+                    })
+                  }
                 />
               </div>
             </div>
+
+            {/* Tax */}
 
             <div className="pm-field">
-              <label>Description</label>
-              <textarea
-                placeholder="What does this product or service include?"
-                value={form.description}
-                onChange={(e) => update({ description: e.target.value })}
+              <label>
+                Tax %
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="18"
+                value={
+                  form.tax_percentage
+                }
+                disabled={
+                  saving
+                }
+                onChange={(
+                  event
+                ) =>
+                  update({
+                    tax_percentage:
+                      event
+                        .target
+                        .value,
+                  })
+                }
               />
             </div>
 
+            {/* Description */}
+
             <div className="pm-field">
-              <label>Notes</label>
+              <label>
+                Description
+              </label>
+
+              <textarea
+                placeholder={
+                  isProduct
+                    ? "Describe this product..."
+                    : "Describe this service..."
+                }
+                value={
+                  form.description
+                }
+                disabled={
+                  saving
+                }
+                onChange={(
+                  event
+                ) =>
+                  update({
+                    description:
+                      event
+                        .target
+                        .value,
+                  })
+                }
+              />
+            </div>
+
+            {/* Notes */}
+
+            <div className="pm-field">
+              <label>
+                Notes
+              </label>
+
               <textarea
                 placeholder="Internal notes (optional)"
-                value={form.notes}
-                onChange={(e) => update({ notes: e.target.value })}
+                value={
+                  form.notes
+                }
+                disabled={
+                  saving
+                }
+                onChange={(
+                  event
+                ) =>
+                  update({
+                    notes:
+                      event
+                        .target
+                        .value,
+                  })
+                }
               />
             </div>
           </div>
 
+          {/* Footer */}
+
           <div className="pm-dialog-footer">
-            <Dialog.Close asChild>
-              <button className="pm-btn-ghost">Cancel</button>
-            </Dialog.Close>
-            <button className="pm-btn-primary" disabled={!canSubmit} onClick={handleSubmit}>
-              Create {isProduct ? "product" : "service"}
+            <button
+              type="button"
+              className="pm-btn-ghost"
+              disabled={saving}
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              className="pm-btn-primary"
+              disabled={
+                !canSubmit ||
+                saving
+              }
+              onClick={() =>
+                void handleSubmit()
+              }
+            >
+              {saving
+                ? "Saving..."
+                : `Create ${
+                    isProduct
+                      ? "product"
+                      : "service"
+                  }`}
             </button>
           </div>
         </Dialog.Content>

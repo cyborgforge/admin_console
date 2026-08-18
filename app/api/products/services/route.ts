@@ -5,29 +5,17 @@ const PRODUCT_SERVICES_TABLE =
   process.env.SUPABASE_PRODUCT_SERVICES_TABLE ??
   "product_services"
 
-function readString(
-  value: unknown,
-  fallback = ""
-) {
-  return typeof value === "string"
-    ? value.trim()
-    : fallback
+function readString(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback
 }
 
-function readNumber(
-  value: unknown,
-  fallback = 0
-) {
+function readNumber(value: unknown, fallback = 0) {
   const parsed = Number(value)
-
-  return Number.isFinite(parsed)
-    ? parsed
-    : fallback
+  return Number.isFinite(parsed) ? parsed : fallback
 }
 
 function getAccessToken(request: Request) {
-  const authHeader =
-    request.headers.get("authorization")
+  const authHeader = request.headers.get("authorization")
 
   if (!authHeader?.startsWith("Bearer ")) {
     return null
@@ -36,39 +24,28 @@ function getAccessToken(request: Request) {
   return authHeader.slice(7).trim()
 }
 
-async function requireAuthenticatedRequest(
-  request: Request
-) {
-  const accessToken =
-    getAccessToken(request)
+async function requireAuthenticatedRequest(request: Request) {
+  const accessToken = getAccessToken(request)
 
   if (!accessToken) {
     return {
       errorResponse: NextResponse.json(
-        {
-          error: "Missing access token.",
-        },
+        { error: "Missing access token." },
         { status: 401 }
       ),
       supabase: null,
     }
   }
 
-  const supabase =
-    getSupabaseServerClient(accessToken)
+  const supabase = getSupabaseServerClient(accessToken)
 
   const { data, error } =
-    await supabase.auth.getUser(
-      accessToken
-    )
+    await supabase.auth.getUser(accessToken)
 
   if (error || !data.user) {
     return {
       errorResponse: NextResponse.json(
-        {
-          error:
-            "Invalid or expired session.",
-        },
+        { error: "Invalid or expired session." },
         { status: 401 }
       ),
       supabase: null,
@@ -81,16 +58,16 @@ async function requireAuthenticatedRequest(
   }
 }
 
-function normalizePayload(
-  payload: Record<string, unknown>
-) {
-  const serviceCode = readString(
-    payload.service_code
-  )
+function normalizePayload(payload: Record<string, unknown>) {
+  // Frontend/types use service_code/service_name.
+  // Actual Supabase table uses code/name.
+  const serviceCode =
+    readString(payload.service_code) ||
+    readString(payload.code)
 
-  const serviceName = readString(
-    payload.service_name
-  )
+  const serviceName =
+    readString(payload.service_name) ||
+    readString(payload.name)
 
   if (!serviceCode || !serviceName) {
     throw new Error(
@@ -99,38 +76,26 @@ function normalizePayload(
   }
 
   return {
-    service_code: serviceCode,
-    service_name: serviceName,
-    description: readString(
-      payload.description
-    ),
-    category: readString(
-      payload.category
-    ),
+    code: serviceCode,
+    name: serviceName,
+    description: readString(payload.description),
+    category: readString(payload.category),
     type: readString(payload.type),
     price: readNumber(payload.price),
-    tax_percentage: readNumber(
-      payload.tax_percentage
-    ),
-    status:
-      readString(payload.status) ||
-      "active",
+    tax_percentage: readNumber(payload.tax_percentage),
+    status: readString(payload.status) || "active",
     notes: readString(payload.notes),
   }
 }
 
 /**
  * GET /api/products/services
- * Get all service records
+ * Get all product services.
  */
-export async function GET(
-  request: Request
-) {
+export async function GET(request: Request) {
   try {
     const authContext =
-      await requireAuthenticatedRequest(
-        request
-      )
+      await requireAuthenticatedRequest(request)
 
     if (
       authContext.errorResponse ||
@@ -176,16 +141,12 @@ export async function GET(
 
 /**
  * POST /api/products/services
- * Create new service
+ * Create a new product service.
  */
-export async function POST(
-  request: Request
-) {
+export async function POST(request: Request) {
   try {
     const authContext =
-      await requireAuthenticatedRequest(
-        request
-      )
+      await requireAuthenticatedRequest(request)
 
     if (
       authContext.errorResponse ||
@@ -200,8 +161,7 @@ export async function POST(
         unknown
       >
 
-    const payload =
-      normalizePayload(body)
+    const payload = normalizePayload(body)
 
     const { data, error } =
       await authContext.supabase
@@ -222,9 +182,7 @@ export async function POST(
     }
 
     return NextResponse.json(
-      {
-        service: data,
-      },
+      { service: data },
       { status: 201 }
     )
   } catch (error) {

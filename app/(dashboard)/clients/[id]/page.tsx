@@ -9,12 +9,15 @@ import { getSupabaseClient } from "@/lib/supabaseClient"
 import ClientDetailsTab from "@/components/clients/clientDetailsTab"
 import { useRouter } from "next/router"
 import ClientDealsTab from "@/components/clients/clientDealsTab"
-
+import ActivitiesTab from "@/components/activities/ActivitiesTab"
+import type { Activity } from "@/types/activity";
 type ClientTab =
   | "details"
   | "deals"
+  | "activities"
   | "subscriptions"
   | "cases"
+
 
 const tabContainerStyle: React.CSSProperties = {
   display: "flex",
@@ -54,6 +57,7 @@ export default function ClientDetailsPage({ params }: PageProps) {
     const [deals, setDeals] = useState<Deal[] | null>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [activities, setActivities] = useState<Activity[]>([]);
 
     //loader function to fetch client details by ID and set state
     const loadClient = async (
@@ -113,6 +117,20 @@ export default function ClientDetailsPage({ params }: PageProps) {
     setClient(data.client)
     setContacts(data.contacts)
     setDeals(data.deals)
+
+
+    const activityResponse = await fetch(
+  `/api/activities?module=client&id=${clientId}`,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }
+);
+
+const activityData = await activityResponse.json();
+
+setActivities(activityData.activities);
   } catch (error) {
     setError(
       error instanceof Error
@@ -154,6 +172,10 @@ useEffect(() => {
     {
       key: "deals",
       label: "Deals (1)",
+    },
+    {
+      key: "activities",
+      label: "Activities",
     },
     // {
     //   key: "subscriptions",
@@ -316,6 +338,12 @@ useEffect(() => {
               <ClientDealsTab deals={deals || []} />
             )}
 
+            {activeTab === "activities" && (
+               <ActivitiesTab
+                  activities={activities}
+                />
+            )}
+
             {activeTab ===
               "subscriptions" && (
               <ClientSubscriptionsTab />
@@ -425,7 +453,7 @@ useEffect(() => {
             </div>
           </div>
 
-          <div className="stat-card">
+          {/* <div className="stat-card">
             <div className="section-heading">
               Activities
             </div>
@@ -435,7 +463,7 @@ useEffect(() => {
             }}>
                 {"No activities recorded."}
             </div>
-          </div>
+          </div> */}
 
           <div className="stat-card">
             <div className="section-heading">

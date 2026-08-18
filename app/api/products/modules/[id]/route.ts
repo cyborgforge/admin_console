@@ -5,29 +5,17 @@ const PRODUCT_MODULES_TABLE =
   process.env.SUPABASE_PRODUCT_MODULES_TABLE ??
   "product_modules"
 
-function readString(
-  value: unknown,
-  fallback = ""
-) {
-  return typeof value === "string"
-    ? value.trim()
-    : fallback
+function readString(value: unknown) {
+  return typeof value === "string" ? value.trim() : ""
 }
 
-function readNumber(
-  value: unknown,
-  fallback = 0
-) {
+function readNumber(value: unknown, fallback = 0) {
   const parsed = Number(value)
-
-  return Number.isFinite(parsed)
-    ? parsed
-    : fallback
+  return Number.isFinite(parsed) ? parsed : fallback
 }
 
 function getAccessToken(request: Request) {
-  const authHeader =
-    request.headers.get("authorization")
+  const authHeader = request.headers.get("authorization")
 
   if (!authHeader?.startsWith("Bearer ")) {
     return null
@@ -36,39 +24,28 @@ function getAccessToken(request: Request) {
   return authHeader.slice(7).trim()
 }
 
-async function requireAuthenticatedRequest(
-  request: Request
-) {
-  const accessToken =
-    getAccessToken(request)
+async function requireAuthenticatedRequest(request: Request) {
+  const accessToken = getAccessToken(request)
 
   if (!accessToken) {
     return {
       errorResponse: NextResponse.json(
-        {
-          error: "Missing access token.",
-        },
+        { error: "Missing access token." },
         { status: 401 }
       ),
       supabase: null,
     }
   }
 
-  const supabase =
-    getSupabaseServerClient(accessToken)
+  const supabase = getSupabaseServerClient(accessToken)
 
   const { data, error } =
-    await supabase.auth.getUser(
-      accessToken
-    )
+    await supabase.auth.getUser(accessToken)
 
   if (error || !data.user) {
     return {
       errorResponse: NextResponse.json(
-        {
-          error:
-            "Invalid or expired session.",
-        },
+        { error: "Invalid or expired session." },
         { status: 401 }
       ),
       supabase: null,
@@ -81,248 +58,306 @@ async function requireAuthenticatedRequest(
   }
 }
 
-function buildUpdateData(
-  payload: Record<string, unknown>
+function buildUpdatePayload(
+  body: Record<string, unknown>
 ) {
-  const updateData: Record<
-    string,
-    unknown
-  > = {}
+  const updateData: Record<string, unknown> = {}
 
   if (
-    typeof payload.product_code ===
-    "string"
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "product_code"
+    ) ||
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "code"
+    )
   ) {
-    updateData.product_code =
-      payload.product_code.trim()
+    const code =
+      readString(body.product_code) ||
+      readString(body.code)
+
+    if (!code) {
+      throw new Error(
+        "Product code cannot be empty."
+      )
+    }
+
+    updateData.code = code
   }
 
   if (
-    typeof payload.product_name ===
-    "string"
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "product_name"
+    ) ||
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "name"
+    )
   ) {
-    updateData.product_name =
-      payload.product_name.trim()
+    const name =
+      readString(body.product_name) ||
+      readString(body.name)
+
+    if (!name) {
+      throw new Error(
+        "Product name cannot be empty."
+      )
+    }
+
+    updateData.name = name
   }
 
   if (
-    typeof payload.description ===
-    "string"
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "description"
+    )
   ) {
     updateData.description =
-      payload.description.trim()
+      readString(body.description)
   }
 
   if (
-    typeof payload.category ===
-    "string"
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "category"
+    )
   ) {
     updateData.category =
-      payload.category.trim()
-  }
-
-  if (typeof payload.type === "string") {
-    updateData.type =
-      payload.type.trim()
-  }
-
-  if (payload.price !== undefined) {
-    updateData.price = readNumber(
-      payload.price
-    )
+      readString(body.category)
   }
 
   if (
-    payload.tax_percentage !==
-    undefined
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "type"
+    )
+  ) {
+    updateData.type =
+      readString(body.type)
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "price"
+    )
+  ) {
+    updateData.price =
+      readNumber(body.price)
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "tax_percentage"
+    )
   ) {
     updateData.tax_percentage =
-      readNumber(
-        payload.tax_percentage
-      )
+      readNumber(body.tax_percentage)
   }
 
   if (
-    typeof payload.status ===
-    "string"
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "status"
+    )
   ) {
     updateData.status =
-      payload.status.trim()
+      readString(body.status)
   }
 
   if (
-    typeof payload.notes === "string"
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "notes"
+    )
   ) {
     updateData.notes =
-      payload.notes.trim()
+      readString(body.notes)
   }
 
   return updateData
 }
 
-/**
- * GET /api/products/modules/:id
- * Get specific module
- */
 export async function GET(
   request: Request,
-  {
-    params,
-  }: {
+  context: {
     params: Promise<{ id: string }>
   }
 ) {
-  const { id } = await params
+  try {
+    const { id } = await context.params
 
-  const authContext =
-    await requireAuthenticatedRequest(
-      request
-    )
+    const authContext =
+      await requireAuthenticatedRequest(request)
 
-  if (
-    authContext.errorResponse ||
-    !authContext.supabase
-  ) {
-    return authContext.errorResponse!
-  }
+    if (
+      authContext.errorResponse ||
+      !authContext.supabase
+    ) {
+      return authContext.errorResponse!
+    }
 
-  const { data, error } =
-    await authContext.supabase
-      .from(PRODUCT_MODULES_TABLE)
-      .select("*")
-      .eq("id", id)
-      .single()
+    const { data, error } =
+      await authContext.supabase
+        .from(PRODUCT_MODULES_TABLE)
+        .select("*")
+        .eq("id", id)
+        .single()
 
-  if (error || !data) {
+    if (error || !data) {
+      return NextResponse.json(
+        {
+          error:
+            error?.message ??
+            "Product module not found.",
+        },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      module: data,
+    })
+  } catch (error) {
     return NextResponse.json(
       {
-        error: "Module not found.",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch module.",
       },
-      { status: 404 }
+      { status: 500 }
     )
   }
-
-  return NextResponse.json({
-    module: data,
-  })
 }
 
-/**
- * PUT /api/products/modules/:id
- * Update module
- */
 export async function PUT(
   request: Request,
-  {
-    params,
-  }: {
+  context: {
     params: Promise<{ id: string }>
   }
 ) {
-  const { id } = await params
+  try {
+    const { id } = await context.params
 
-  const authContext =
-    await requireAuthenticatedRequest(
-      request
-    )
+    const authContext =
+      await requireAuthenticatedRequest(request)
 
-  if (
-    authContext.errorResponse ||
-    !authContext.supabase
-  ) {
-    return authContext.errorResponse!
-  }
+    if (
+      authContext.errorResponse ||
+      !authContext.supabase
+    ) {
+      return authContext.errorResponse!
+    }
 
-  const body =
-    (await request.json()) as Record<
-      string,
-      unknown
-    >
+    const body =
+      (await request.json()) as Record<
+        string,
+        unknown
+      >
 
-  const updateData =
-    buildUpdateData(body)
+    const updateData =
+      buildUpdatePayload(body)
 
-  if (
-    Object.keys(updateData).length ===
-    0
-  ) {
+    if (
+      Object.keys(updateData).length === 0
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "No valid fields were provided for update.",
+        },
+        { status: 400 }
+      )
+    }
+
+    const { data, error } =
+      await authContext.supabase
+        .from(PRODUCT_MODULES_TABLE)
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single()
+
+    if (error || !data) {
+      return NextResponse.json(
+        {
+          error:
+            error?.message ??
+            "Failed to update module.",
+        },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json({
+      module: data,
+    })
+  } catch (error) {
     return NextResponse.json(
       {
         error:
-          "No fields provided for update.",
+          error instanceof Error
+            ? error.message
+            : "Invalid update payload.",
       },
       { status: 400 }
     )
   }
-
-  const { data, error } =
-    await authContext.supabase
-      .from(PRODUCT_MODULES_TABLE)
-      .update(updateData)
-      .eq("id", id)
-      .select()
-      .single()
-
-  if (error || !data) {
-    return NextResponse.json(
-      {
-        error:
-          error?.message ??
-          "Failed to update module.",
-      },
-      { status: 400 }
-    )
-  }
-
-  return NextResponse.json({
-    module: data,
-  })
 }
 
-/**
- * DELETE /api/products/modules/:id
- * Delete module
- */
 export async function DELETE(
   request: Request,
-  {
-    params,
-  }: {
+  context: {
     params: Promise<{ id: string }>
   }
 ) {
-  const { id } = await params
+  try {
+    const { id } = await context.params
 
-  const authContext =
-    await requireAuthenticatedRequest(
-      request
-    )
+    const authContext =
+      await requireAuthenticatedRequest(request)
 
-  if (
-    authContext.errorResponse ||
-    !authContext.supabase
-  ) {
-    return authContext.errorResponse!
-  }
+    if (
+      authContext.errorResponse ||
+      !authContext.supabase
+    ) {
+      return authContext.errorResponse!
+    }
 
-  const { error } =
-    await authContext.supabase
-      .from(PRODUCT_MODULES_TABLE)
-      .delete()
-      .eq("id", id)
+    const { error } =
+      await authContext.supabase
+        .from(PRODUCT_MODULES_TABLE)
+        .delete()
+        .eq("id", id)
 
-  if (error) {
+    if (error) {
+      return NextResponse.json(
+        {
+          error:
+            error.message ??
+            "Failed to delete module.",
+        },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+    })
+  } catch (error) {
     return NextResponse.json(
       {
         error:
-          error.message ??
-          "Failed to delete module.",
+          error instanceof Error
+            ? error.message
+            : "Failed to delete module.",
       },
-      { status: 400 }
+      { status: 500 }
     )
   }
-
-  return NextResponse.json({
-    success: true,
-  })
 }
