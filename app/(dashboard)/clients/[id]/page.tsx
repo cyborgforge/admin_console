@@ -1,263 +1,637 @@
 "use client"
 
 import { use, useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Client } from "@/types/client"
-import { Contact } from "@/types/contacts"
-import { Deal } from "@/types/deals"
-import { getSupabaseClient } from "@/lib/supabaseClient"
-import ClientDetailsTab from "@/components/clients/clientDetailsTab"
-import { useRouter } from "next/router"
+
 import ClientDealsTab from "@/components/clients/clientDealsTab"
+import ClientDetailsTab from "@/components/clients/clientDetailsTab"
 import ActivitiesTab from "@/components/activities/ActivitiesTab"
-import type { Activity } from "@/types/activity";
+
+import { getSupabaseClient } from "@/lib/supabaseClient"
+
+import type { Activity } from "@/types/activity"
+import type {
+  Client,
+  ClientStatus,
+} from "@/types/client"
+import type { Contact } from "@/types/contacts"
+import type { Deal } from "@/types/deals"
+
 type ClientTab =
   | "details"
   | "deals"
   | "activities"
-  | "subscriptions"
-  | "cases"
 
-
-const tabContainerStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-  padding: "4px",
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius)",
-  marginBottom: "16px",
+type ClientBranchSummary = {
+  id: string
+  branch_name: string
+  city?: string | null
+  state?: string | null
 }
 
-const getTabStyle = (
-  active: boolean
-): React.CSSProperties => ({
-  border: "none",
-  cursor: "pointer",
-  padding: "8px 14px",
-  borderRadius: "calc(var(--radius) - 4px)",
-  fontSize: "13px",
-  fontWeight: 500,
-  background: active
-    ? "var(--accent-dim)"
-    : "transparent",
-  color: active
-    ? "var(--accent)"
-    : "var(--text3)",
-  transition: "all .15s ease",
-})
+type ClientDetailsResponse = {
+  client?: Record<string, unknown>
+  contacts?: Contact[]
+  deals?: Deal[]
+  error?: string
+}
+
+type BranchesResponse = {
+  branches?: ClientBranchSummary[]
+  error?: string
+}
+
+type ActivitiesResponse = {
+  activities?: Activity[]
+  error?: string
+}
 
 interface PageProps {
-  params: Promise<{ id: string }>
+  params: Promise<{
+    id: string
+  }>
 }
-export default function ClientDetailsPage({ params }: PageProps) {
-    const [client, setClient] = useState<Client | null>(null)
-    const [contacts, setContacts] = useState<Contact[] | null>([])
-    const [deals, setDeals] = useState<Deal[] | null>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
-    const [activities, setActivities] = useState<Activity[]>([]);
 
-    //loader function to fetch client details by ID and set state
-    const loadClient = async (
-  clientId: string,
-  showLoader = false
-) => {
-  if (showLoader) {
-    setLoading(true)
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function readString(
+  value: unknown
+) {
+  return typeof value === "string"
+    ? value.trim()
+    : ""
+}
+
+function readNullableString(
+  value: unknown
+) {
+  const normalized =
+    readString(value)
+
+  return normalized || null
+}
+
+function normalizeStatus(
+  value: unknown
+): ClientStatus {
+  if (
+    value === "inactive" ||
+    value === "prospect"
+  ) {
+    return value
   }
 
-  try {
-    setError(null)
+  return "active"
+}
 
-    const supabase = getSupabaseClient()
+/*
+ * API / Supabase currently returns:
+ *
+ * created_at
+ * updated_at
+ *
+ * while the existing Client UI type expects:
+ *
+ * createdAt
+ * updatedAt
+ *
+ * Keep that compatibility conversion here rather
+ * than changing the shared Client type.
+ */
+function mapClientResponse(
+  value: Record<string, unknown>
+): Client {
+  return {
+    id:
+      readString(
+        value.id
+      ),
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    company_name:
+      readString(
+        value.company_name
+      ),
 
-    const token = session?.access_token
+    industry:
+      readNullableString(
+        value.industry
+      ),
 
-    if (!token) {
-      throw new Error(
-        "Please sign in to load client."
-      )
-    }
+    website:
+      readNullableString(
+        value.website
+      ),
 
-    const response = await fetch(
-      `/api/clients/${clientId}`,
-      {
-        cache: "no-store",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+    gst_number:
+      readNullableString(
+        value.gst_number
+      ),
+
+    company_size:
+      readNullableString(
+        value.company_size
+      ),
+
+    email:
+      readNullableString(
+        value.email
+      ),
+
+    phone:
+      readNullableString(
+        value.phone
+      ),
+
+    address_line_1:
+      readNullableString(
+        value.address_line_1
+      ),
+
+    city:
+      readNullableString(
+        value.city
+      ),
+
+    state:
+      readNullableString(
+        value.state
+      ),
+
+    country:
+      readNullableString(
+        value.country
+      ),
+
+    postal_code:
+      readNullableString(
+        value.postal_code
+      ),
+
+    status:
+      normalizeStatus(
+        value.status
+      ),
+
+    createdAt:
+      readString(
+        value.createdAt
+      ) ||
+      readString(
+        value.created_at
+      ),
+
+    updatedAt:
+      readString(
+        value.updatedAt
+      ) ||
+      readString(
+        value.updated_at
+      ),
+
+    created_by:
+      readNullableString(
+        value.created_by
+      ),
+
+    color:
+      readString(
+        value.color
+      ) ||
+      "#4c7ee1",
+
+    notes:
+      readNullableString(
+        value.notes
+      ),
+  }
+}
+
+function getBranchLocation(
+  branch:
+    ClientBranchSummary
+) {
+  return [
+    branch.city,
+    branch.state,
+  ]
+    .filter(Boolean)
+    .join(", ")
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export default function ClientDetailsPage({
+  params,
+}: PageProps) {
+  const {
+    id,
+  } =
+    use(params)
+
+  const [
+    client,
+    setClient,
+  ] =
+    useState<
+      Client | null
+    >(null)
+
+  const [
+    contacts,
+    setContacts,
+  ] =
+    useState<Contact[]>(
+      []
     )
 
-    if (!response.ok) {
-      const responseData =
-        (await response.json()) as {
-          error?: string
+  const [
+    deals,
+    setDeals,
+  ] =
+    useState<Deal[]>(
+      []
+    )
+
+  const [
+    branches,
+    setBranches,
+  ] =
+    useState<
+      ClientBranchSummary[]
+    >([])
+
+  const [
+    activities,
+    setActivities,
+  ] =
+    useState<Activity[]>(
+      []
+    )
+
+  const [
+    activeTab,
+    setActiveTab,
+  ] =
+    useState<ClientTab>(
+      "details"
+    )
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true)
+
+  const [
+    error,
+    setError,
+  ] =
+    useState<
+      string | null
+    >(null)
+
+  const [
+    warning,
+    setWarning,
+  ] =
+    useState<
+      string | null
+    >(null)
+
+  /* ------------------------------------------------------------------------ */
+  /* Load Client                                                              */
+  /* ------------------------------------------------------------------------ */
+
+  useEffect(() => {
+    if (!id) {
+      return
+    }
+
+    let cancelled =
+      false
+
+    async function loadClientDetails() {
+      try {
+        setLoading(true)
+        setError(null)
+        setWarning(null)
+
+        const supabase =
+          getSupabaseClient()
+
+        const {
+          data: {
+            session,
+          },
+        } =
+          await supabase.auth.getSession()
+
+        const token =
+          session?.access_token
+
+        if (!token) {
+          throw new Error(
+            "Please sign in to load client details."
+          )
         }
 
-      throw new Error(
-        responseData.error ??
-          "Failed to load client."
-      )
+        const headers = {
+          Authorization:
+            `Bearer ${token}`,
+        }
+
+        /*
+         * Main Client API already returns:
+         *
+         * client
+         * contacts
+         * deals
+         *
+         * Branches and activities are separate APIs.
+         */
+
+        const [
+          clientResponse,
+          branchesResponse,
+          activitiesResponse,
+        ] =
+          await Promise.all([
+            fetch(
+              `/api/clients/${encodeURIComponent(
+                id
+              )}`,
+              {
+                cache:
+                  "no-store",
+                headers,
+              }
+            ),
+
+            fetch(
+              `/api/branches?client_id=${encodeURIComponent(
+                id
+              )}`,
+              {
+                cache:
+                  "no-store",
+                headers,
+              }
+            ),
+
+            fetch(
+              `/api/activities?module=client&id=${encodeURIComponent(
+                id
+              )}`,
+              {
+                cache:
+                  "no-store",
+                headers,
+              }
+            ),
+          ])
+
+        /* ------------------------------------------------------------------ */
+        /* Client / Contacts / Deals                                          */
+        /* ------------------------------------------------------------------ */
+
+        const clientData =
+          (await clientResponse.json()) as
+            ClientDetailsResponse
+
+        if (
+          !clientResponse.ok ||
+          !clientData.client
+        ) {
+          throw new Error(
+            clientData.error ??
+              "Failed to load client details."
+          )
+        }
+
+        if (cancelled) {
+          return
+        }
+
+        setClient(
+          mapClientResponse(
+            clientData.client
+          )
+        )
+
+        setContacts(
+          clientData.contacts ??
+            []
+        )
+
+        setDeals(
+          clientData.deals ??
+            []
+        )
+
+        /* ------------------------------------------------------------------ */
+        /* Branches + Activities                                              */
+        /* ------------------------------------------------------------------ */
+
+        const warnings:
+          string[] = []
+
+        const branchesData =
+          (await branchesResponse.json()) as
+            BranchesResponse
+
+        if (
+          branchesResponse.ok
+        ) {
+          setBranches(
+            branchesData.branches ??
+              []
+          )
+        } else {
+          setBranches([])
+
+          warnings.push(
+            branchesData.error ??
+              "Branches could not be loaded."
+          )
+        }
+
+        const activitiesData =
+          (await activitiesResponse.json()) as
+            ActivitiesResponse
+
+        if (
+          activitiesResponse.ok
+        ) {
+          setActivities(
+            activitiesData.activities ??
+              []
+          )
+        } else {
+          setActivities([])
+
+          warnings.push(
+            activitiesData.error ??
+              "Activities could not be loaded."
+          )
+        }
+
+        setWarning(
+          warnings.length >
+            0
+            ? warnings.join(
+                " "
+              )
+            : null
+        )
+      } catch (
+        caughtError
+      ) {
+        if (cancelled) {
+          return
+        }
+
+        setClient(null)
+        setContacts([])
+        setDeals([])
+        setBranches([])
+        setActivities([])
+
+        setError(
+          caughtError instanceof
+            Error
+            ? caughtError.message
+            : "Failed to load client details."
+        )
+      } finally {
+        if (
+          !cancelled
+        ) {
+          setLoading(
+            false
+          )
+        }
+      }
     }
 
-    const data =
-      (await response.json()) as {
-        client: Client
-        contacts: Contact[]
-        deals: Deal[]
-      }
+    void loadClientDetails()
 
-    setClient(data.client)
-    setContacts(data.contacts)
-    setDeals(data.deals)
+    return () => {
+      cancelled =
+        true
+    }
+  }, [id])
 
+  /* ------------------------------------------------------------------------ */
+  /* Tabs                                                                     */
+  /* ------------------------------------------------------------------------ */
 
-    const activityResponse = await fetch(
-  `/api/activities?module=client&id=${clientId}`,
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
+  const tabs: Array<{
+    key: ClientTab
+    label: string
+  }> = [
+    {
+      key:
+        "details",
+
+      label:
+        "Details",
     },
-  }
-);
 
-const activityData = await activityResponse.json();
+    {
+      key:
+        "deals",
 
-setActivities(activityData.activities);
-  } catch (error) {
-    setError(
-      error instanceof Error
-        ? error.message
-        : "Failed to load client."
+      label:
+        `Deals (${deals.length})`,
+    },
+
+    {
+      key:
+        "activities",
+
+      label:
+        "Activities",
+    },
+  ]
+
+  /* ------------------------------------------------------------------------ */
+  /* Loading                                                                  */
+  /* ------------------------------------------------------------------------ */
+
+  if (loading) {
+    return (
+      <div className="content">
+        <div className="stat-card text-sm text-[var(--text3)]">
+          Loading client details...
+        </div>
+      </div>
     )
-  } finally {
-    setLoading(false)
   }
-}
 
-// fetching current client using url client id
-// const params = useParams<{
-//   id: string
-// }>()
+  /* ------------------------------------------------------------------------ */
+  /* Error                                                                    */
+  /* ------------------------------------------------------------------------ */
 
+  if (!client) {
+    return (
+      <div className="content">
+        <div className="rounded-lg border border-red-500/25 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+          {
+            error ??
+            "Client not found."
+          }
+        </div>
+      </div>
+    )
+  }
 
-
-  const unwrappedParams = use(params)
-  const id = unwrappedParams.id
-  //const router = useRouter()
-
-useEffect(() => {
-  if (!id) return
-
-  loadClient(id, true)
-}, [id])
-
-//---------
-
-  const [activeTab, setActiveTab] =
-    useState<ClientTab>("details")
-
-  const tabs = [
-    {
-      key: "details",
-      label: "Details",
-    },
-    {
-      key: "deals",
-      label: "Deals (1)",
-    },
-    {
-      key: "activities",
-      label: "Activities",
-    },
-    // {
-    //   key: "subscriptions",
-    //   label: "Subscriptions (1)",
-    // },
-    // {
-    //   key: "cases",
-    //   label: "Cases (1)",
-    // },
-  ] as const
+  /* ------------------------------------------------------------------------ */
+  /* UI                                                                       */
+  /* ------------------------------------------------------------------------ */
 
   return (
     <div className="content">
+
+      {/* Non-critical API warning */}
+
+      {warning && (
+        <div className="mb-4 rounded-lg border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-amber-300">
+          {
+            warning
+          }
+        </div>
+      )}
+
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent:
-            "space-between",
-          alignItems: "center",
-          marginBottom: "18px",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              color: "var(--text3)",
-              fontSize: "12px",
-              marginBottom: "4px",
-            }}
-          >
-            Client
-          </div>
 
-          <h1
-            style={{
-              fontSize: "24px",
-              fontWeight: 600,
-              color: "var(--text)",
-            }}
-          >
-            Apollo Pharmacy
-          </h1>
+      <div className="mb-[18px]">
+        <div className="mb-1 text-xs text-[var(--text3)]">
+          Client
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-          }}
-        >
-          <Button
-            variant="outline"
-            className="btn btn-ghost"
-          >
-            Edit Client
-          </Button>
-
-          <Button className="btn btn-primary">
-            New Deal
-          </Button>
-        </div>
+        <h1 className="text-2xl font-semibold text-[var(--text)]">
+          {
+            client.company_name ||
+            "Client"
+          }
+        </h1>
       </div>
 
-      {/* Layout */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "260px minmax(0,1fr) 300px",
-          gap: "16px",
-          alignItems: "start",
-        }}
-      >
-        {/* Left Sidebar */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-          }}
-        >
+      {/* Main Layout */}
+
+      <div className="grid items-start gap-4 xl:grid-cols-[260px_minmax(0,1fr)_300px]">
+
+        {/* -------------------------------------------------------------- */}
+        {/* Left Sidebar                                                   */}
+        {/* -------------------------------------------------------------- */}
+
+        <aside className="flex flex-col gap-3">
+
+          {/* Company Information */}
+
           <div className="stat-card">
             <div className="section-heading">
               Company Information
@@ -265,19 +639,14 @@ useEffect(() => {
 
             <div className="info-row">
               <div className="info-row-label">
-                Branch
-              </div>
-              <div className="info-row-val">
-                {"Chennai"}
-              </div>
-            </div>
-
-            <div className="info-row">
-              <div className="info-row-label">
                 Industry
               </div>
+
               <div className="info-row-val">
-                 {client?.industry ?? "—"}
+                {
+                  client.industry ??
+                  "—"
+                }
               </div>
             </div>
 
@@ -285,231 +654,270 @@ useEffect(() => {
               <div className="info-row-label">
                 Status
               </div>
-              <div className="info-row-val">
-                {client?.status ?? "—"}
+
+              <div className="info-row-val capitalize">
+                {
+                  client.status
+                }
               </div>
             </div>
 
             <div className="info-row">
               <div className="info-row-label">
-                Managed By
+                Created By
               </div>
-              <div className="info-row-val">
-               {client?.created_by ?? "—"}
+
+              <div className="info-row-val break-all">
+                {
+                  client.created_by ??
+                  "—"
+                }
               </div>
             </div>
           </div>
+
+          {/* Branches */}
 
           <div className="stat-card">
             <div className="section-heading">
-              Documents (3)
+              Branches (
+              {
+                branches.length
+              }
+              )
             </div>
-          </div>
-        </div>
 
-        {/* Center Workspace */}
-        <div>
-          <div style={tabContainerStyle}>
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                style={getTabStyle(
-                  activeTab === tab.key
-                )}
-                onClick={() =>
-                  setActiveTab(
-                    tab.key as ClientTab
+            {branches.length ===
+            0 ? (
+              <div className="mt-3 text-sm text-[var(--text3)]">
+                No branches found.
+              </div>
+            ) : (
+              branches.map(
+                (
+                  branch,
+                  index
+                ) => {
+                  const location =
+                    getBranchLocation(
+                      branch
+                    )
+
+                  return (
+                    <div
+                      className="info-row"
+                      key={
+                        branch.id
+                      }
+                    >
+                      <div className="info-row-label">
+                        Branch{" "}
+                        {
+                          index +
+                          1
+                        }
+                      </div>
+
+                      <div className="info-row-val">
+                        <div>
+                          {
+                            branch.branch_name
+                          }
+                        </div>
+
+                        {location && (
+                          <div className="mt-1 text-xs text-[var(--text3)]">
+                            {
+                              location
+                            }
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )
                 }
-              >
-                {tab.label}
-              </button>
-            ))}
+              )
+            )}
+          </div>
+        </aside>
+
+        {/* -------------------------------------------------------------- */}
+        {/* Center Workspace                                               */}
+        {/* -------------------------------------------------------------- */}
+
+        <main className="min-w-0">
+
+          {/* Tabs */}
+
+          <div className="mb-4 flex items-center gap-1.5 overflow-x-auto rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-1">
+
+            {tabs.map(
+              (tab) => {
+                const active =
+                  activeTab ===
+                  tab.key
+
+                return (
+                  <button
+                    key={
+                      tab.key
+                    }
+                    type="button"
+                    onClick={() =>
+                      setActiveTab(
+                        tab.key
+                      )
+                    }
+                    className={`whitespace-nowrap rounded-[calc(var(--radius)-4px)] px-3.5 py-2 text-[13px] font-medium transition-colors ${
+                      active
+                        ? "bg-[var(--accent-dim)] text-[var(--accent)]"
+                        : "text-[var(--text3)] hover:text-[var(--text)]"
+                    }`}
+                  >
+                    {
+                      tab.label
+                    }
+                  </button>
+                )
+              }
+            )}
           </div>
 
+          {/* Tab Content */}
+
           <div className="client-workspace-content">
+
             {activeTab ===
               "details" && (
-               <ClientDetailsTab client={client} />
+              <ClientDetailsTab
+                client={
+                  client
+                }
+              />
             )}
 
             {activeTab ===
               "deals" && (
-              <ClientDealsTab deals={deals || []} />
-            )}
-
-            {activeTab === "activities" && (
-               <ActivitiesTab
-                  activities={activities}
-                />
-            )}
-
-            {activeTab ===
-              "subscriptions" && (
-              <ClientSubscriptionsTab />
+              <ClientDealsTab
+                deals={
+                  deals
+                }
+              />
             )}
 
             {activeTab ===
-              "cases" && (
-              <ClientCasesTab />
+              "activities" && (
+              <ActivitiesTab
+                activities={
+                  activities
+                }
+              />
             )}
+
           </div>
-        </div>
+        </main>
 
-        {/* Right Sidebar */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-          }}
-        >
-            {/* Contacts Highlight Card*/}
-         <div className="stat-card">
-  <div className="section-heading">
-    Contacts ({contacts?.length})
-  </div>
+        {/* -------------------------------------------------------------- */}
+        {/* Right Sidebar                                                  */}
+        {/* -------------------------------------------------------------- */}
 
-  <div
-    style={{
-      display: "flex",
-      flexDirection: "column",
-      gap: "10px",
-      marginTop: "12px",
-    }}
-  >
-    {contacts?.length === 0 ? (
-      <div
-        style={{
-          color: "var(--text3)",
-          fontSize: "13px",
-        }}
-      >
-        No contacts found
-      </div>
-    ) : (
-      contacts?.map((contact) => (
-        <div
-          key={contact.id}
-          style={{
-            padding: "12px",
-            border: "1px solid var(--border)",
-            borderRadius: "10px",
-            background: "var(--surface)",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "14px",
-              fontWeight: 600,
-              color: "var(--text)",
-            }}
-          >
-            {contact.name}
-          </div>
+        <aside className="flex flex-col gap-3">
 
-          <div
-            style={{
-              fontSize: "12px",
-              color: "var(--text2)",
-              marginTop: "2px",
-            }}
-          >
-            {contact.designation ?? "No designation"}
-          </div>
+          {/* Contacts */}
 
-          {/* {(contact.email || contact.mobile) && (
-            <div
-              style={{
-                marginTop: "8px",
-                fontSize: "12px",
-                color: "var(--text3)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "2px",
-              }}
-            >
-              {contact.email && (
-                <span>{contact.email}</span>
-              )}
+          <div className="stat-card">
+            <div className="section-heading">
+              Contacts (
+              {
+                contacts.length
+              }
+              )
+            </div>
 
-              {contact.mobile && (
-                <span>{contact.mobile}</span>
+            <div className="mt-3 flex flex-col gap-2.5">
+
+              {contacts.length ===
+              0 ? (
+                <div className="text-sm text-[var(--text3)]">
+                  No contacts found.
+                </div>
+              ) : (
+                contacts.map(
+                  (
+                    contact
+                  ) => {
+                    const contactPhone =
+                      contact.mobile ||
+                      contact.phone
+
+                    return (
+                      <div
+                        key={
+                          contact.id
+                        }
+                        className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-3"
+                      >
+                        <div className="text-sm font-semibold text-[var(--text)]">
+                          {
+                            contact.name
+                          }
+                        </div>
+
+                        <div className="mt-0.5 text-xs text-[var(--text2)]">
+                          {
+                            contact.designation ||
+                            contact.department ||
+                            "No designation"
+                          }
+                        </div>
+
+                        {(contact.email ||
+                          contactPhone) && (
+                          <div className="mt-2 space-y-1 text-xs text-[var(--text3)]">
+
+                            {contact.email && (
+                              <div className="break-all">
+                                {
+                                  contact.email
+                                }
+                              </div>
+                            )}
+
+                            {contactPhone && (
+                              <div>
+                                {
+                                  contactPhone
+                                }
+                              </div>
+                            )}
+
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                )
               )}
             </div>
-          )} */}
-        </div>
-      ))
-    )}
-  </div>
-</div>
+          </div>
+
+          {/* Notes */}
 
           <div className="stat-card">
             <div className="section-heading">
               Notes
             </div>
-            <div>
-                {client?.notes || "No notes recorded."}
+
+            <div className="mt-3 text-sm text-[var(--text2)]">
+              {
+                client.notes ||
+                "No notes recorded."
+              }
             </div>
           </div>
 
-          {/* <div className="stat-card">
-            <div className="section-heading">
-              Activities
-            </div>
-             <div style={{
-              color: "var(--text3)",
-              fontSize: "13px",
-            }}>
-                {"No activities recorded."}
-            </div>
-          </div> */}
-
-          <div className="stat-card">
-            <div className="section-heading">
-              Tasks
-            </div>
-             <div style={{
-              color: "var(--text3)",
-              fontSize: "13px",
-            }}>
-                {"No activities recorded."}
-            </div>
-          </div>
-        </div>
+        </aside>
       </div>
-    </div>
-  )
-}
-
-// function ClientDetailsTab() {
-//   return (
-//     <div className="stat-card">
-//       Details Content
-//     </div>
-//   )
-// }
-
-// function ClientDealsTab() {
-//   return (
-//     <div className="stat-card">
-//       Deals Pipeline
-//     </div>
-//   )
-// }
-
-function ClientSubscriptionsTab() {
-  return (
-    <div className="stat-card">
-      Subscriptions Table
-    </div>
-  )
-}
-
-function ClientCasesTab() {
-  return (
-    <div className="stat-card">
-      Cases Table
     </div>
   )
 }
