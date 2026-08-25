@@ -62,7 +62,11 @@ export default function ClientOnboardingDetailPage({
   const [error, setError] = useState<string | null>(null)
   const [updatingResponseId, setUpdatingResponseId] = useState<string | null>(null)
 
-  async function updateResponseStatus(responseId: string, status: "Approved" | "Rejected") {
+  async function updateResponseStatus(
+    responseId: string,
+    status: "Approved" | "Rejected",
+    resource: "forms" | "documents" = "forms"
+  ) {
     setUpdatingResponseId(responseId)
     try {
       const supabase = getSupabaseClient()
@@ -76,7 +80,7 @@ export default function ClientOnboardingDetailPage({
         return
       }
 
-      const res = await fetch(`/api/onboarding-forms-response/${responseId}/status`, {
+      const res = await fetch(`/api/onboarding-${resource}-response/${responseId}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -134,6 +138,12 @@ export default function ClientOnboardingDetailPage({
 
       const data = (await response.json()) as OnboardingClientDetail
       setDetail(data)
+
+      setSelectedResponse((current) =>
+        current
+          ? data.form_responses.find((item) => item.id === current.id) ?? null
+          : null
+      )
 
       if (!selectedForm && data.assigned_forms.length > 0) {
         setSelectedForm(data.assigned_forms[0])
@@ -362,6 +372,10 @@ export default function ClientOnboardingDetailPage({
                 <OnboardingDocumentsTable
                   documents={detail.assigned_documents}
                   responses={detail.document_responses}
+                  updatingResponseId={updatingResponseId}
+                  onResponseStatus={(responseId, status) =>
+                    void updateResponseStatus(responseId, status, "documents")
+                  }
                 />
               </div>
               <div className="stat-card">
@@ -374,15 +388,29 @@ export default function ClientOnboardingDetailPage({
           {activeTab === "forms" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="stat-card">
-                <div className="section-heading">Assigned Forms</div>
-                <OnboardingFormsTable
-                  forms={detail.assigned_forms}
-                  responses={detail.form_responses}
-                  onSelect={(form) => {
-                    setSelectedForm(form)
+                <label htmlFor="onboarding-form-select" className="section-heading">
+                  Select Form
+                </label>
+                <select
+                  id="onboarding-form-select"
+                  className="filter-select"
+                  value={selectedForm?.id ?? ""}
+                  onChange={(event) => {
+                    const form = detail.assigned_forms.find(
+                      (item) => item.id === event.target.value
+                    )
+                    setSelectedForm(form ?? null)
                     setSelectedResponse(null)
                   }}
-                />
+                  style={{ marginTop: "10px", width: "100%" }}
+                >
+                  <option value="">Select a form</option>
+                  {detail.assigned_forms.map((form) => (
+                    <option key={form.id} value={form.id}>
+                      {form.form?.form_name ?? form.form_id}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="stat-card">
@@ -424,25 +452,29 @@ export default function ClientOnboardingDetailPage({
                             </td>
                             <td onClick={(e) => e.stopPropagation()}>
                               <div style={{ display: "flex", gap: "6px" }}>
-                                <Button
-                                  size="sm"
-                                  className="btn btn-primary"
-                                  disabled={updatingResponseId === response.id}
-                                  onClick={() => void updateResponseStatus(response.id, "Approved")}
-                                  style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
-                                >
-                                  Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="btn btn-ghost"
-                                  disabled={updatingResponseId === response.id}
-                                  onClick={() => void updateResponseStatus(response.id, "Rejected")}
-                                  style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
-                                >
-                                  Reject
-                                </Button>
+                                {response.status === "Pending" ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      className="btn btn-primary"
+                                      disabled={updatingResponseId === response.id}
+                                      onClick={() => void updateResponseStatus(response.id, "Approved")}
+                                      style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="btn btn-ghost"
+                                      disabled={updatingResponseId === response.id}
+                                      onClick={() => void updateResponseStatus(response.id, "Rejected")}
+                                      style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </>
+                                ) : null}
                               </div>
                             </td>
                           </tr>

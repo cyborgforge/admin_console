@@ -169,31 +169,33 @@ export function ResponseReviewPanel({
         </div>
       ) : null}
 
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          marginTop: "12px",
-          borderTop: "1px solid var(--border)",
-          paddingTop: "12px",
-        }}
-      >
-        <Button
-          className="btn btn-primary"
-          disabled={reviewing}
-          onClick={() => void updateStatus("Approved")}
+      {response.status === "Pending" ? (
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            marginTop: "12px",
+            borderTop: "1px solid var(--border)",
+            paddingTop: "12px",
+          }}
         >
-          Approve Response
-        </Button>
-        <Button
-          className="btn btn-ghost"
-          variant="outline"
-          disabled={reviewing}
-          onClick={() => void updateStatus("Rejected")}
-        >
-          Reject Response
-        </Button>
-      </div>
+          <Button
+            className="btn btn-primary"
+            disabled={reviewing}
+            onClick={() => void updateStatus("Approved")}
+          >
+            Approve Response
+          </Button>
+          <Button
+            className="btn btn-ghost"
+            variant="outline"
+            disabled={reviewing}
+            onClick={() => void updateStatus("Rejected")}
+          >
+            Reject Response
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

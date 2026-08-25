@@ -641,6 +641,28 @@ export function createStatusHandler(
         )
       }
 
+      if (
+        config.table.endsWith("_response") &&
+        (body.status === "Approved" || body.status === "Rejected")
+      ) {
+        const { data: currentResponse, error: currentResponseError } =
+          await authContext.supabase
+            .from(config.table)
+            .select("status")
+            .eq("id", id)
+            .maybeSingle()
+
+        if (currentResponseError || !currentResponse) {
+          throw new Error(`${config.responseKey} not found.`)
+        }
+
+        if (currentResponse.status !== "Pending") {
+          throw new Error(
+            `Only pending responses can be approved or rejected.`
+          )
+        }
+      }
+
       const updateData: Record<string, unknown> = {
         status: body.status,
       }

@@ -1,4 +1,5 @@
 import { FileText, ExternalLink } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 import type {
   OnboardingDocumentAssigned,
@@ -10,9 +11,16 @@ import { OnboardingStatusBadge } from "./status-badge"
 export function OnboardingDocumentsTable({
   documents,
   responses,
+  updatingResponseId,
+  onResponseStatus,
 }: {
   documents: OnboardingDocumentAssigned[]
   responses: OnboardingDocumentResponse[]
+  updatingResponseId?: string | null
+  onResponseStatus?: (
+    responseId: string,
+    status: "Approved" | "Rejected"
+  ) => void
 }) {
   return (
     <div className="table-wrap">
@@ -23,12 +31,13 @@ export function OnboardingDocumentsTable({
             <th>Status</th>
             <th>Due</th>
             <th>Latest Submission</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {documents.length === 0 ? (
             <tr>
-              <td colSpan={4} className="empty">
+              <td colSpan={5} className="empty">
                 No documents assigned
               </td>
             </tr>
@@ -92,6 +101,31 @@ export function OnboardingDocumentsTable({
                     ) : (
                       "-"
                     )}
+                  </td>
+                  <td>
+                    {latest?.status === "Pending" && onResponseStatus ? (
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <Button
+                          size="sm"
+                          className="btn btn-primary"
+                          disabled={updatingResponseId === latest.id}
+                          onClick={() => onResponseStatus(latest.id, "Approved")}
+                          style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="btn btn-ghost"
+                          disabled={updatingResponseId === latest.id}
+                          onClick={() => onResponseStatus(latest.id, "Rejected")}
+                          style={{ height: "26px", fontSize: "11px", padding: "0 10px" }}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    ) : null}
                   </td>
                 </tr>
               )
